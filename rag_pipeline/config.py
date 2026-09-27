@@ -19,8 +19,12 @@ class ChunkingConfig:
 class EmbeddingModelConfig:
     model_name: str = "BAAI/bge-small-en-v1.5"
     normalize_embeddings: bool = True
-    vector_store_name: str = "chroma_db"
     query_instruction: str = "Represent this sentence for searching relevant passages: "
+
+
+@dataclass
+class VectorStoreConfig:
+    vector_store_name: str = "PIL_docs_vector_store"
 
 
 @dataclass
