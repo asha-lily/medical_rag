@@ -23,18 +23,21 @@ vector_store_config = VectorStoreConfig()
 def run_indexing():
     """Parse, chunk, and embed the sample documents, and persist the vector store to disk."""
 
-    pages = []
+    sections = []
     for path in sorted(docs_config.docs_dir.glob("*.pdf")):
         try:
-            doc_pages = parse_document(path)
+            doc_sections = parse_document(path)
         except Exception as e:
             log.warning("Skipping %s: failed to parse (%s)", path.name, e)
             continue
-        pages.extend(doc_pages)
-        log.info("Parsed %s: %d pages", path.name, len(doc_pages))
+        if not doc_sections:
+            log.warning("Skipping %s: parsed to 0 sections", path.name)
+            continue
+        sections.extend(doc_sections)
+        log.info("Parsed %s: %d sections", path.name, len(doc_sections))
 
-    chunks = chunk_documents(pages)
-    log.info("Produced %d chunks from %d pages", len(chunks), len(pages))
+    chunks = chunk_documents(sections)
+    log.info("Produced %d chunks from %d sections", len(chunks), len(sections))
 
     embedding_model = create_embedding_model()
     if vector_store_exists():

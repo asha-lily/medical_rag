@@ -11,10 +11,12 @@ def chunk_documents(
     chunk_size: int = config.chunk_size,
     chunk_overlap: int = config.chunk_overlap,
 ) -> list[Document]:
-    """Split page-level Documents into chunks.
+    """Turn section-level Documents into chunks.
 
-    Each chunk inherits its source page's metadata (`source`, `page`, ...)
-    plus a `chunk_index` marking its position within that page.
+    Each section becomes exactly one chunk if it fits within `chunk_size`;
+    oversized sections are split further with `RecursiveCharacterTextSplitter`.
+    Each chunk inherits its source section's metadata (`source`, `heading`, ...)
+    plus a `chunk_index` marking its position within that section.
     """
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -23,11 +25,22 @@ def chunk_documents(
 
     chunks = []
     for document in documents:
-        for chunk_index, chunk in enumerate(splitter.split_documents([document])):
+        sub_documents = (
+            [document]
+            if len(document.page_content) <= chunk_size
+            else splitter.split_documents([document])
+        )
+        for chunk_index, chunk in enumerate(sub_documents):
             chunk.metadata["chunk_index"] = chunk_index
-            medicine = chunk.metadata.get("medicine")
-            if medicine:
-                chunk.page_content = f"Medicine: {medicine}\n\n{chunk.page_content}"
+            prefix_lines = []
+            if medicine := chunk.metadata.get("medicine_name"):
+                prefix_lines.append(f"Medicine: {medicine}")
+            if heading := chunk.metadata.get("heading"):
+                prefix_lines.append(f"Section: {heading}")
+            if prefix_lines:
+                chunk.page_content = (
+                    "\n".join(prefix_lines) + "\n\n" + chunk.page_content
+                )
             chunks.append(chunk)
 
     return chunks

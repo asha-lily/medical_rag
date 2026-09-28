@@ -1,36 +1,61 @@
-import re
 from pathlib import Path
 
-from langchain_community.document_loaders import PyPDFLoader
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    AcceleratorDevice,
+    AcceleratorOptions,
+    PdfPipelineOptions,
+)
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling_core.types.doc.labels import DocItemLabel
 from langchain_core.documents import Document
+
+_pipeline_options = PdfPipelineOptions()
+# MPS (Apple Silicon) doesn't support float64, which the layout model requires.
+_pipeline_options.accelerator_options = AcceleratorOptions(device=AcceleratorDevice.CPU)
+
+_converter = DocumentConverter(
+    format_options={
+        InputFormat.PDF: PdfFormatOption(pipeline_options=_pipeline_options)
+    }
+)
 
 
 def parse_document(document_path: Path) -> list[Document]:
-    """Load a PDF and return one cleaned `Document` (+ metadata) per page."""
-    loader = PyPDFLoader(document_path)
-    raw_pages = loader.load()
-
+    """Parse a PDF into one `Document` per section, using Docling's layout-aware
+    heading detection to find section boundaries."""
     medicine_name = (
         Path(document_path).stem.replace("_PIL", "").replace("_", " ").capitalize()
     )
+    source = Path(document_path).name
+
+    docling_doc = _converter.convert(str(document_path)).document
+
+    sections = []
+    current = None
+    for item, _level in docling_doc.iterate_items():
+        text = getattr(item, "text", "")
+        page = item.prov[0].page_no if item.prov else None
+        if item.label in (DocItemLabel.TITLE, DocItemLabel.SECTION_HEADER):
+            current = {"heading": text, "text": "", "page": page}
+            sections.append(current)
+        else:
+            if current is None:
+                current = {"heading": None, "text": "", "page": page}
+                sections.append(current)
+            current["text"] += text + "\n"
 
     return [
         Document(
-            page_content=_clean_text(raw_page.page_content),
+            page_content=section["text"].strip(),
             metadata={
                 "medicine_name": medicine_name,
-                "source": Path(raw_page.metadata["source"]).name,
-                "page": raw_page.metadata["page"] + 1,
-                "total_pages": raw_page.metadata["total_pages"],
+                "source": source,
+                "heading": section["heading"],
+                "page": section["page"],
+                "section_index": section_index,
             },
         )
-        for raw_page in raw_pages
+        for section_index, section in enumerate(sections)
+        if section["text"].strip()
     ]
-
-
-def _clean_text(text: str) -> str:
-    """Collapse whitespace and limit back-to-back newlines to two."""
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"[ \t]+\n", "\n", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
