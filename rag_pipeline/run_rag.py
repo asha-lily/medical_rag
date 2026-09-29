@@ -1,3 +1,7 @@
+"""
+uv run python -m rag_pipeline.run_rag "What are the side effects of ibuprofen?"
+"""
+
 import argparse
 import logging
 
@@ -33,9 +37,23 @@ def run_rag(question: str) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Ask a question about the travel insurance documents."
+        description="""
+        Ask a question about one of the following medicines:
+        - Antacids
+        - Antiseptic cream
+        - Cetirizine
+        - Cough suppressants
+        - Decongestants
+        - Hydrocortisone cream
+        - Ibuprofen
+        - Motion sickness tablets
+        - Oral rehydration solution
+        - Paracetamol
+        """
     )
-    parser.add_argument("question", type=str, help="The question to answer.")
+    parser.add_argument(
+        "question", type=str, help="The question that you want answered."
+    )
     args = parser.parse_args()
 
     answer = run_rag(args.question)
