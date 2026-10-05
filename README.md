@@ -4,7 +4,7 @@ This project builds a RAG pipeline for UK medicine leaflets
 
 ### Disclaimer
 
-It's crucial to note that the aim of this project is not to build an accurate, safe system that can be relied on, but rather to explore the challenges associated with applying RAG and agentic behaviour to a relatively simple and constrained health-related problem space.
+*It's crucial to note that the aim of this project is not to build an accurate, safe system that can be relied on, but rather to explore the challenges associated with applying RAG and agentic behaviour to a relatively simple and constrained health-related problem space.*
 
 # About this project
 
@@ -28,7 +28,7 @@ I'm setting out with the following plan:
 - [ ] Evaluate this pipeline on basic metrics, including using RAGAS with an LLM judge to evaluate faithfulness and answer relevancy.
 - [ ] Build a second retriever with access to a vector store of medical guideline documents. 
     - Where PILs address the question of 'how to take a medicine safely', guidelines address 'what's the right treatment or care'
-    - Providers of guidelines include https://www.sign.ac.uk/guidelines/pharmacological-management-of-migraine/ & https://www.who.int/publications/who-guidelines
+    - Providers of guidelines include [sign](https://www.sign.ac.uk/guidelines/pharmacological-management-of-migraine/) & the [WHO](https://www.who.int/publications/who-guidelines)
 - [ ] Give an agent access to both retrievers (PIL & guidelines) and let it choose which to use for a given question (i.e routing). Measure routing accuracy.
     - The user could then ask a question such as "My doctor prescribed amlodipine for high blood pressure. Why this medicine, and how should I take it?" The "why" is in the guideline; the "how" is in the PIL.
 - [ ] Add more complex agentic behaviour, e.g provide access to tools, enable the agent to ask clarifying questions, plan sub-queries etc.
@@ -63,7 +63,7 @@ Make sure the Ollama server is running (open the Ollama app, or run `ollama serv
 
 
 
-## Running Indexing
+## Running Indexing and question-answering
 
 `uv run python -m rag_pipeline.run_indexing`
 

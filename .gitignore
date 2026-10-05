@@ -5,4 +5,4 @@ __pycache__/
 chroma_db/
 .DS_Store
 documents/
-leaflets_and_guidelines/PILs
+data
