@@ -1,6 +1,47 @@
 This project is a work in progress.
 
-Building an end-to-end RAG pipeline.
+This project builds a RAG pipeline for UK medicine leaflets
+
+### Disclaimer
+
+It's crucial to note that the aim of this project is not to build an accurate, safe system that can be relied on, but rather to explore the challenges associated with applying RAG and agentic behaviour to a relatively simple and constrained health-related problem space.
+
+# About this project
+
+I'm interested in how AI is being used in healthcare, and how it might be used in the future.
+
+One such application is chatbots designed to answer health and medicine-related questions. These already exist.
+
+This use-case initially struck me as very risky, and in need of very thorough evaluation and strict guardrails to minimise potential harm to users. Returning the wrong dose, or hallucinating a seemingly minor detail could be deadly. As chatbots become agentic, with access to tools and the ability to autonomously carry out multiple actions, the risks multiply.
+
+My curiosity about the potential benefits of using AI in healthcare, and the challenges of doing this safely, motivates this project. 
+
+I'd like to build an agentic RAG system in which the retrieval step has access to patient information leaflets (PILs). These are the leaflets inside every pack of medicine sold in the UK.
+
+A system like this could be useful to the average person who may have over-the-counter medicines at home or in their bag but without the original information leaflet.
+
+# Project roadmap
+
+I'm setting out with the following plan:
+
+- [ ] Build a simple RAG pipeline that can answer questions by retrieving relevant information from patient information leaflets.
+- [ ] Evaluate this pipeline on basic metrics, including using RAGAS with an LLM judge to evaluate faithfulness and answer relevancy.
+- [ ] Build a second retriever with access to a vector store of medical guideline documents. 
+    - Where PILs address the question of 'how to take a medicine safely', guidelines address 'what's the right treatment or care'
+    - Providers of guidelines include https://www.sign.ac.uk/guidelines/pharmacological-management-of-migraine/ & https://www.who.int/publications/who-guidelines
+- [ ] Give an agent access to both retrievers (PIL & guidelines) and let it choose which to use for a given question (i.e routing). Measure routing accuracy.
+    - The user could then ask a question such as "My doctor prescribed amlodipine for high blood pressure. Why this medicine, and how should I take it?" The "why" is in the guideline; the "how" is in the PIL.
+- [ ] Add more complex agentic behaviour, e.g provide access to tools, enable the agent to ask clarifying questions, plan sub-queries etc.
+
+A key thing to measure will be whether the agent admits when it doesn't have the relevant information to answer the question, since hallucinating an answer puts the user at great risk in this domain. The system should also return citations with every answer.
+
+# About the dataset
+
+See `data/PILs`. I'm starting off with a set of 10 PILs for 10 common over-the-counter medicines.
+
+An important note at this stage is that there's a lot of variety in the format of PILs from different providers. To build a robust RAG system I would want to sample from a diverse range of formats and make sure the parsing step works for all of them. For the MVP stage of this project I'm intentionally using a small dataset so that I can inspect them manually, and while I've tried to select a range of PIL formats, the small dataset size means that this diversity will be limited.
+
+For more details on the dataset and the plan for this project, see `notebooks/building_the_dataset.ipynb`.
 
 # Setup
 
@@ -14,130 +55,18 @@ Building an end-to-end RAG pipeline.
 
 Ruff now runs automatically on staged files at every commit.
 
-<br>
+3. Install [Ollama](https://ollama.com/download) (e.g. `brew install ollama` on macOS) and pull the model used for generation and evaluation:
 
-# RAG Pipeline Components
+       ollama pull llama3.2
 
-### 1. Ingestion & Parsing
-- Convert raw data (e.g PDFs) into structured text.
-- Preserve metadata, e.g page numbers, section titles, source, date etc
-
-    *Choose a parsing method & what metadata to preserve.*
-
-### 2. Chunking
-- Split documents into chunks to be embedded. 
-- Chunks should be large enough to capture context, but small enough that they contain a distinct idea which could be retrieved to answer a question.
-
-    *Choose a chunking method based on the types of documents.*
-
-### 3. Embedding
-- Convert document chunks & the query into vectors.
-
-    *Choose an embedding model.*
-
-### 4. Vector Store
-- Where embeddings are stored and retrieved from.
-
-    *Choose a vector store, indexing method and metadata filtering.*
-
-### 5. Query processing
-- Query re-writing
-- HyDE: hypothetical document embeddings
-- multi-query generation
-- decomposition of complex questions into sub-questions
-
-### 6. Retrieval
-- Retrieve the k most relevant chunks
-
-    *Choose k and a search technique.*
-
-### 7. Re-ranking
-- Cross-encoder or LLM that assigns a relevance score to each of the initial retrieved chunks
-- Retain the n-most relevant chunks
-
-    *Choose a re-ranking model and value of n*
-
-### 8. Context assembly & prompting
-- Construct the final prompt
-- Include instructions for when the model doesn't know the answer
-
-    *Choose chunk order and how metadata is injected.*
-
-### 9. Generation
-- Pass the query + context to the LLM
-
-    *Choose which LLM is most suitable, temperature, response schema / structured output format*
-
-### 10. Evaluation
-- retrieval quality: precision, recall@k, MRR
-    - these can be calculated by manually labelling a golden dataset of queries mapped to relevant document IDs
-- generation quality: faithfulness/groundedness, answer relevance, hallucination rate
-    - faithfulness: whether the generated answer is actually supported by the retrieved information (i.e not hallucinating). Using the RAGAS framework this is calculated as the `number of claims supported by retrieved info` divided by `the total number of claims` (the answer is first broken down into 'claims')
-    - answer relevance: whether the answer actually addresses the question asked (penalises incomplete or off-topic answers, even if faithful). The RAGAS framework uses an LLM to generate synthetic questions that the answer could plausibly be answering, embeds them and calculates the cosine similarity between them and an embedding of the actual question.
-- frameworks: RAGAS, DeepEval
-
-#### Choosing an LLM judge for RAGAS
-
-`RAGAS` (Retrieval Augmented Generation ASessment) is a library for evaluating RAG pipelines. It provides built-in metrics such as faithfulness and answer relevance. I will use these for the first version of my pipeline, but later on I will consider which metrics are most appropriate to my problem space.
-
-Note that RAGAS uses an LLM judge to calculate metrics. A potential source of bias is using the same LLM as a judge and as the generation model, since the model is more likely to rate it's own outputs higher than those of another model. Bias could also be introduced by choosing an LLM judge from the same family as the generation model. Since I'm using Llama 3.2 as my generation model, I'll look outside of the Llama family for my judge model.
-
-Since RAGAS involves multiple reasoning steps, a reasonably powerful model should be used as the judge.
-
-It's important to check that the LLM judge is aligned with what a human would say. To check for this alignment I'll need to manually label some examples and compare to the judge's decisions.
-    
-Another implication of using LLM-as-a-judge for evaluation is the cost and latency of extra LLM calls. However, latency may not be too much of an issue if evaluation is run offline.
-
-#### Summary
-
-- Build a golden dataset of queries mapped to relevant document IDs. Automatically calculate retrieval quality metrics on this test set each time the pipeline is updated.
-- Use RAGAS to calculate generation-quality metrics, starting with faithfulness and answer relevancy. Choose which LLM to use as the judge and validate it against human-labelled samples.
-- Consider calculating domain-specific metrics (e.g custom judge metrics) in the future.
+Make sure the Ollama server is running (open the Ollama app, or run `ollama serve`) before running the RAG pipeline or evaluation.
 
 
-### 11. Serving & Orchestration
-- caching
-- async / streaming
-- latency budgets
-- updates to the vectore store as new documents become available
 
-### 12. Observability & Monitoring
-- logging queries, retrieved chunks & generations
-    - LangSmith?
-- record latency at each stage
-- capture user feedback to help find failure modes
-
-<br>
-<br>
-
-# Breaking down the problem
-
-First we want to load, parse, chunk and index the documents into the vector store. This can be considered an 'offline' phase.
-
-Once we have a vector store, we can perform retrieval and generation, i.e get an answer to a query. 
-
-So, we actually need to build 2 pipelines, one for each of the above stages.
-
-In this project we'll use LangChain.
-
-Once we have a basic RAG system working, we want to evaluate its performance. From there we can consider adding re-ranking, query processing, context assembly etc and see whether each change improves performance.
-
-
-# Sample Documents
-
-I am using my travel insurance documents - specifically the ones that don't contain any of my personal information. This is a good use case for RAG since for a single travel insurance policy there are multiple documents, some of which are dense with information.
-
-# Running Indexing
+## Running Indexing
 
 `uv run python -m rag_pipeline.run_indexing`
 
+Once you've built the vector store of document chunks, you can generate an answer to your query:
 
-# Future Work
-
-Parsing
-- How are tables extracted using `PDFPlumberLoader`?
-- How can we extract images / diagrams? `UnstructuredPDFLoader`
-- How do the in-built langchain loaders compare to docling
-
-Generation
-- Could make prompts configurable by defining them in the config file instead of in generation.py. Could then build `_PROMPT` inside `create_rag_chain()`.
+`uv run python -m rag_pipeline.run_rag "<question>"`
