@@ -4,7 +4,7 @@ from langchain_ollama import ChatOllama
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 
 from rag_pipeline.config import GenerationConfig
 from rag_pipeline.retrieval import DocumentRetriever
@@ -42,7 +42,9 @@ def _format_context(docs: list[Document]) -> str:
     return "\n\n".join(parts)
 
 
-def create_rag_chain(retriever: DocumentRetriever, config: GenerationConfig | None = None):
+def create_rag_chain(
+    retriever: DocumentRetriever, config: GenerationConfig | None = None
+):
     """Return an LCEL chain: retriever → prompt → LLM → string.
     This can be invoked with a question string:
     """
@@ -51,19 +53,41 @@ def create_rag_chain(retriever: DocumentRetriever, config: GenerationConfig | No
 
     llm = ChatOllama(model=config.model_name, num_predict=config.max_tokens)
 
-    chain = (
-        {"context": retriever | _format_context, "question": RunnablePassthrough()}
+    answer_chain = (
+        RunnablePassthrough.assign(context=lambda x: _format_context(x["docs"]))
         | _PROMPT
         | llm
         | StrOutputParser()
     )
-    return chain
+    return RunnableParallel(docs=retriever, question=RunnablePassthrough()).assign(
+        answer=answer_chain
+    )
 
 
-def generate(question: str, retriever: DocumentRetriever, config: GenerationConfig | None = None) -> str:
-    """Run a single RAG query and return the answer string."""
+def generate(
+    question: str,
+    retriever: DocumentRetriever,
+    config: GenerationConfig | None = None,
+) -> dict:
+    """Run a single RAG query.
+
+    Returns a dict with:
+        question (str)
+        answer   (str)
+        docs     (list[Document]) — the chunks the answer was generated from
+    """
     chain = create_rag_chain(retriever, config)
-    answer = chain.invoke(question)
+    result = chain.invoke(question)
+
     log.info("Q: %s", question)
-    log.info("A: %s", answer)
-    return answer
+    log.info("A: %s", result["answer"])
+    log.info("Sources:")
+    for i, doc in enumerate(result["docs"], start=1):
+        log.info(
+            "  [%d] %s, page %s (%s)",
+            i,
+            doc.metadata.get("source", "unknown"),
+            doc.metadata.get("page", "?"),
+            doc.metadata.get("heading", "no heading"),
+        )
+    return result

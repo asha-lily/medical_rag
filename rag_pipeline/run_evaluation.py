@@ -12,39 +12,20 @@ from rag_pipeline.vector_store import (
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
-# A small test set of questions about the travel insurance documents.
-# Fill in ground_truth strings once you know the correct answers from the PDFs;
-# they are only required for context_precision and context_recall metrics.
+# A small test set of questions about the PIL documents.
 TEST_SET = [
-    {"question": "What is the maximum cancellation cover?", "ground_truth": ""},
-    {"question": "What is the emergency medical expenses limit?", "ground_truth": ""},
-    {
-        "question": "Is there cover for pre-existing medical conditions?",
-        "ground_truth": "",
-    },
-    {"question": "What is the excess amount on the policy?", "ground_truth": ""},
-    {
-        "question": "Is baggage cover included, and what is the limit?",
-        "ground_truth": "",
-    },
-    {"question": "How do I make a claim?", "ground_truth": ""},
-    {
-        "question": "Are winter sports or adventure activities covered?",
-        "ground_truth": "",
-    },
-    {
-        "question": "What is the maximum trip duration that is covered?",
-        "ground_truth": "",
-    },
+    {"question": "", "ground_truth": ""},
 ]
 
 
-def _collect_sample(question: str, retriever, chain) -> dict:
+def _collect_sample(question: str, chain) -> dict:
     """Run retrieval and generation for one question, capturing both contexts and answer."""
-    docs = retriever.invoke(question)
-    contexts = [doc.page_content for doc in docs]
-    answer = chain.invoke(question)
-    return {"question": question, "answer": answer, "contexts": contexts}
+    result = chain.invoke(question)
+    return {
+        "question": question,
+        "answer": result["answer"],
+        "contexts": [doc.page_content for doc in result["docs"]],
+    }
 
 
 def run_evaluation() -> None:
@@ -63,7 +44,7 @@ def run_evaluation() -> None:
     for entry in TEST_SET:
         q = entry["question"]
         log.info("  Q: %s", q)
-        sample = _collect_sample(q, retriever, chain)
+        sample = _collect_sample(q, chain)
         sample["ground_truth"] = entry.get("ground_truth", "")
         samples.append(sample)
 

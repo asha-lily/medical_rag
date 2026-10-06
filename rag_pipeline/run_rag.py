@@ -27,12 +27,10 @@ def run_rag(question: str) -> str:
         raise RuntimeError(
             "Vector store not found. Run `uv run python -m rag_pipeline.run_indexing` first."
         )
-
     embedding_model = create_embedding_model()
     store = load_vector_store(embedding_model)
     retriever = create_retriever(store, embedding_model)
-
-    return generate(question, retriever)
+    return generate(question, retriever)["answer"]
 
 
 if __name__ == "__main__":

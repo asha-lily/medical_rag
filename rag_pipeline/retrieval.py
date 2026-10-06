@@ -6,7 +6,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 
 from rag_pipeline.config import EmbeddingModelConfig, RetrievalConfig
 
-embedding_config = EmbeddingModelConfig
+embedding_config = EmbeddingModelConfig()
 retrieval_config = RetrievalConfig()
 
 DEFAULT_K = retrieval_config.k_chunks_to_retrieve

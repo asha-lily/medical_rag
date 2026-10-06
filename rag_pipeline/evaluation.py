@@ -2,7 +2,7 @@ import logging
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
-from ragas import EvaluationDataset, evaluate
+from ragas import EvaluationDataset, evaluate, RunConfig
 from ragas.dataset_schema import SingleTurnSample
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
@@ -12,10 +12,19 @@ from rag_pipeline.config import EmbeddingModelConfig, GenerationConfig, RAGASCon
 
 log = logging.getLogger(__name__)
 
+ragas_config = RAGASConfig()
+
 
 def _make_ragas_llm(config: RAGASConfig) -> LangchainLLMWrapper:
     """Wrap a Langchain chat Ollama model in a RAGAS LLM interface."""
-    return LangchainLLMWrapper(ChatOllama(model=config.model_name))
+    return LangchainLLMWrapper(
+        ChatOllama(
+            model=config.model_name,
+            num_predict=config.max_tokens,
+            temperature=config.temperature,
+            reasoning=config.reasoning_level,
+        )
+    )
 
 
 def _make_ragas_embeddings(config: EmbeddingModelConfig) -> LangchainEmbeddingsWrapper:
@@ -36,11 +45,11 @@ def build_metrics(
         ragas_config = RAGASConfig()
     if emb_config is None:
         emb_config = EmbeddingModelConfig()
-    llm = _make_ragas_llm(ragas_config)
-    embeddings = _make_ragas_embeddings(emb_config)
+    ragas_llm = _make_ragas_llm(ragas_config)
+    ragas_embeddings = _make_ragas_embeddings(emb_config)
     return [
-        Faithfulness(llm=llm),
-        AnswerRelevancy(llm=llm, embeddings=embeddings),
+        Faithfulness(llm=ragas_llm),
+        AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings),
     ]
 
 
@@ -69,6 +78,11 @@ def evaluate_rag_samples(
         for s in samples
     ]
     dataset = EvaluationDataset(samples=ragas_samples)
+
+    run_config = RunConfig(
+        timeout=ragas_config.timeout_seconds,
+        max_workers=ragas_config.max_workers,
+    )
     metrics = build_metrics(ragas_config, emb_config)
     log.info("Running RAGAS on %d samples with %d metrics.", len(samples), len(metrics))
-    return evaluate(dataset, metrics=metrics)
+    return evaluate(dataset, metrics=metrics, run_config=run_config)
