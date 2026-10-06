@@ -51,6 +51,7 @@ def build_vector_store(
     return Chroma.from_documents(
         documents=chunks,  # placeholder for this example
         embedding=embedding_model,
+        ids=[chunk.metadata["chunk_id"] for chunk in chunks],
         persist_directory=persist_directory,
     )
 

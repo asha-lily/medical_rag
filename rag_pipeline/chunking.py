@@ -32,6 +32,9 @@ def chunk_documents(
         )
         for chunk_index, chunk in enumerate(sub_documents):
             chunk.metadata["chunk_index"] = chunk_index
+            chunk.metadata["chunk_id"] = (
+                f"{chunk.metadata['source']}#{chunk.metadata['section_index']}.{chunk_index}"
+            )
             prefix_lines = []
             if medicine := chunk.metadata.get("medicine_name"):
                 prefix_lines.append(f"Medicine: {medicine}")
