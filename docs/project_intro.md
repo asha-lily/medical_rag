@@ -59,6 +59,11 @@ When searching for each medicine on the MHRA website, the results should be filt
 
 An important note at this stage is that there's a lot of variety in the format of PILs from different providers. To build a robust RAG system I would want to sample from a diverse range of formats and make sure the parsing step works for all of them. For the MVP stage of this project I'm intentionally using a small dataset, and while I've tried to select a range of PIL formats, the small dataset size means that this diversity will be limited.
 
+## Leaflet licences
+
+The MHRA products site has no terms on reuse or redistribution. Neither the homepage nor the "About this service" page says anything about copyright, licensing or reuse of the documents.
+
+To be safe, I won't upload the documents to my github repo. However, anyone wanting to reproduce the work in this repo can download similar documents for themselves.
 
 # Parsing, cleaning and chunking
 

@@ -52,14 +52,30 @@ Ideas for queries to test:
 
 #### Retrieval Quality
 
-For a given query, we can identify the ID(s) of the chunk(s) containing relevant information to answer the query. The retriever returns the K chunks that are most semantically similar to the query. We are interested in whether these K chunks include the relevant chunks. [Common metrics](https://www.evidentlyai.com/llm-guide/rag-evaluation) related to this include:
+For a given query, we can identify the ID(s) of the chunk(s) containing relevant information to answer the query. The retriever returns the K chunks that are most semantically similar to the query. [Common metrics](https://www.evidentlyai.com/llm-guide/rag-evaluation) related to this include:
 
 - Precision@k: of the top k retrieved items, how many are actually relevant?
 - Recall@k: of all relevant items, how many were retrieved in the top k?
 - Hit rate: Did at least one relevant item appear in the top k? (yes/no)
 - NDCG@k (Normalized Discounted Cumulative Gain): rewards correct items appearing higher in rank
+- MRR (mean reciprocal rank): inverse of the rank of the first relevant chunk among all retrieved chunks.
+
+Since safety is a priority, recall@k is a good metric as it will reflect the number of relevant chunks that retrieval misses. Missing a chunk translates to missing potentially important information.
+
+MRR tells us whether the most useful chunk was retrieved as one of the most important. This relates to ranking, so when making changes such as adding a re-ranker, changes in ranking will be reflected in MRR.
 
 
-This gives us a query-chunk ID ground truth pair. We can input the query to the retriever and say that the result is a pass if the correct chunk appears in the retrieved chunks. Since we set the value of K, where K is the number of chunks to retrieve, we can calculate this metric for different values of K. This metric is sometimes called `Hit rate@K` or `recall@K`.
 
-This assumes there is only one relevant chunk per query, but what if there are multiple?
+#### Answer relevancy 
+
+The RAGAS prompt template for answer relevancy asks the judge to mark "evasive, vague" answers like "I don't know" as noncommittal: 1. In RAGAS's code, the score is then multiplied by zero when all 3 generated questions are marked noncommittal.
+
+That means a correct refusal scores 0 on answer relevancy. For example, the ibuprofen test case, where the system rightly said it didn't have enough information, would score 0.
+
+In this project, refusing is often the safe and correct behaviour, but the metric penalises this. 
+
+When building the golden set, I should:
+
+- Label which questions should be refused.
+- Report answer relevancy only on questions that should be answered.
+- Separately, measure refusal accuracy: did the system refuse when it should have, and answer when it should have?

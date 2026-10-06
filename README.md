@@ -55,9 +55,11 @@ For more details on the dataset and the plan for this project, see `notebooks/bu
 
 Ruff now runs automatically on staged files at every commit.
 
-3. Install [Ollama](https://ollama.com/download) (e.g. `brew install ollama` on macOS) and pull the model used for generation and evaluation:
+3. Install [Ollama](https://ollama.com/download) (e.g. `brew install ollama` on macOS) and pull the models used for generation and evaluation:
 
        ollama pull llama3.2
+
+       ollama pull gpt-oss:20b
 
 Make sure the Ollama server is running (open the Ollama app, or run `ollama serve`) before running the RAG pipeline or evaluation.
 
