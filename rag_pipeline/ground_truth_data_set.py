@@ -1,4 +1,4 @@
-"""Load and validate the golden evaluation set (data/golden_dataset.yaml)."""
+"""Load and validate the ground truth data set (data/ground_truth_dataset.yaml)."""
 
 import logging
 from dataclasses import dataclass, field
@@ -9,7 +9,7 @@ import yaml
 log = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_GOLDEN_SET_PATH = _PROJECT_ROOT / "data" / "golden_dataset.yaml"
+DEFAULT_GROUND_TRUTH_SET_PATH = _PROJECT_ROOT / "data" / "ground_truth_dataset.yaml"
 
 RISK_LEVELS = ("high", "medium", "low")
 
@@ -24,7 +24,7 @@ class Evidence:
 
 
 @dataclass
-class GoldenQuestion:
+class GroundTruthQuestion:
     id: str
     question: str
     risk: str
@@ -36,9 +36,9 @@ class GoldenQuestion:
     notes: str = ""
 
 
-def _parse_entry(entry: dict) -> GoldenQuestion:
+def _parse_entry(entry: dict) -> GroundTruthQuestion:
     evidence = [Evidence(**item) for item in entry.get("evidence") or []]
-    return GoldenQuestion(
+    return GroundTruthQuestion(
         id=entry["id"],
         question=entry["question"],
         risk=entry["risk"],
@@ -51,8 +51,8 @@ def _parse_entry(entry: dict) -> GoldenQuestion:
     )
 
 
-def validate(questions: list[GoldenQuestion]) -> list[str]:
-    """Return a list of problems with the golden set (empty if none)."""
+def validate(questions: list[GroundTruthQuestion]) -> list[str]:
+    """Return a list of problems with the ground truth set (empty if none)."""
     problems = []
     seen_ids = set()
     for q in questions:
@@ -70,13 +70,15 @@ def validate(questions: list[GoldenQuestion]) -> list[str]:
     return problems
 
 
-def is_placeholder(question: GoldenQuestion) -> bool:
+def is_placeholder(question: GroundTruthQuestion) -> bool:
     """True if any evidence quote is still a TODO placeholder."""
     return any(ev.quote.strip().upper().startswith("TODO") for ev in question.evidence)
 
 
-def load_golden_set(path: Path = DEFAULT_GOLDEN_SET_PATH) -> list[GoldenQuestion]:
-    """Load the golden set, skipping unfinished (TODO) entries.
+def load_ground_truth_set(
+    path: Path = DEFAULT_GROUND_TRUTH_SET_PATH,
+) -> list[GroundTruthQuestion]:
+    """Load the ground truth set, skipping unfinished (TODO) entries.
 
     Raises ValueError if the set has structural problems.
     """
@@ -85,7 +87,7 @@ def load_golden_set(path: Path = DEFAULT_GOLDEN_SET_PATH) -> list[GoldenQuestion
     questions = [_parse_entry(entry) for entry in entries]
     problems = validate(questions)
     if problems:
-        raise ValueError("Golden set has problems:\n  " + "\n  ".join(problems))
+        raise ValueError("Ground truth set has problems:\n  " + "\n  ".join(problems))
 
     placeholders = [q.id for q in questions if is_placeholder(q)]
     if placeholders:
