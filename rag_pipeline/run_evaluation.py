@@ -1,6 +1,6 @@
 import logging
 
-from rag_pipeline.evaluation import evaluate_rag_samples
+from rag_pipeline.ragas_evaluation import evaluate_rag_samples
 from rag_pipeline.generation import create_rag_chain
 from rag_pipeline.retrieval import create_retriever
 from rag_pipeline.vector_store import (

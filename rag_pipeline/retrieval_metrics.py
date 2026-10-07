@@ -1,4 +1,4 @@
-"""Retrieval metrics computed against evidence quotes in the golden set.
+"""Retrieval metrics computed against evidence quotes in the ground truth dataset.
 
 Recall is measured over evidence items (facts), not chunks. With chunk
 overlap, one quote can appear in two chunks; counting facts avoids
@@ -14,7 +14,7 @@ import re
 import unicodedata
 
 from langchain_core.documents import Document
-from rag_pipeline.golden_set import Evidence
+from rag_pipeline.ground_truth_data_set import Evidence
 
 _QUOTE_MARKS = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
 _DASHES = re.compile(r"[‐‑‒–—−]")

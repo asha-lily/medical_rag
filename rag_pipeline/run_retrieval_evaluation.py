@@ -70,31 +70,23 @@ def check_evidence_findable(
 
 def evaluate_question(q: GoldenQuestion, retrieved: list[Document]) -> dict:
     ranks = evidence_ranks(retrieved, q.evidence)
-    essential_ranks = [r for r, ev in zip(ranks, q.evidence) if ev.essential]
 
     row = {
         "id": q.id,
         "risk": q.risk,
         "category": q.category,
         "n_evidence": len(q.evidence),
-        "n_essential": len(essential_ranks),
         "evidence_ranks": ranks,
         "reciprocal_rank": reciprocal_rank(ranks),
     }
     for k in K_VALUES:
         row[f"recall@{k}"] = recall_at_k(ranks, k)
-        # None when a question has no essential evidence, so it's left out of averages.
-        row[f"all_essential@{k}"] = (
-            all_found_at_k(essential_ranks, k) if essential_ranks else None
-        )
     return row
 
 
 def summarise(results: pd.DataFrame) -> pd.DataFrame:
     """Mean of each metric, overall and by risk level."""
-    metric_cols = ["reciprocal_rank"] + [
-        f"{name}@{k}" for name in ("recall", "all_essential") for k in K_VALUES
-    ]
+    metric_cols = ["reciprocal_rank"] + [f"recall@{k}" for k in K_VALUES]
     numeric = results[metric_cols].astype(float)
     overall = numeric.mean().to_frame("all").T
     by_risk = numeric.groupby(results["risk"]).mean()

@@ -41,7 +41,7 @@ See `data/PILs`. I'm starting off with a set of 10 PILs for 10 common over-the-c
 
 An important note at this stage is that there's a lot of variety in the format of PILs from different providers. To build a robust RAG system I would want to sample from a diverse range of formats and make sure the parsing step works for all of them. For the MVP stage of this project I'm intentionally using a small dataset so that I can inspect them manually, and while I've tried to select a range of PIL formats, the small dataset size means that this diversity will be limited.
 
-For more details on the dataset and the plan for this project, see `notebooks/building_the_dataset.ipynb`.
+For more details on the dataset and the plan for this project, see `notebooks/project_intro.md`.
 
 # Setup
 
