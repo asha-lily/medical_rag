@@ -163,7 +163,14 @@ Given the manual work required to build this dataset, I'll keep it small for the
 While building this dataset I decided to add some additional fields to each sample:
 
 - medicine (str): the name of the medicine that the question asks about. In future I could add an evaluation metric to check whether the sources cited in the answer come from the correct medicine document.
-- category (enum): a label to help ensure good coverage of different topics. The categories currently include: `side_effects`, `out_of_scope_medicine` (i.e a medicine that we don't currently have a document for), `pregnancy_breastfeeding`, `max_dose`
+- category (enum): a label to help ensure good coverage of different topics. The categories currently include:      
+    - `side_effects`
+    - `out_of_scope_medicine`: i.e a medicine that we don't currently have a document for
+    - `breastfeeding`
+    - `max_dose`
+    - `pregnancy`
+    - `suitable_conditions`: i.e asking whether a medicine can help with a specific condition
+    - `combinations`: questions asking about whether multuple different medications can be taken together
 - answerable (bool): whether or not the question can be answered given the information in the documents
 
 I've also broken down the `evidence` field into:
