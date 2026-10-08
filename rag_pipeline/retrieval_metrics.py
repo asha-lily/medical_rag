@@ -22,17 +22,23 @@ _WHITESPACE = re.compile(r"\s+")
 
 
 def normalise(text: str) -> str:
-    """Normalise text so cosmetic PDF-parsing differences don't block a match."""
+    """Normalise text so cosmetic PDF-parsing differences don't block a match.
+
+    All whitespace is removed, because the PDF parser sometimes drops spaces
+    ("are breast-feeding" becomes "arebreast-feeding") or adds them
+    ("painkillers , you"). The result is for matching, not for display.
+    """
     text = unicodedata.normalize("NFKC", text)
     text = text.replace("­", "")  # soft hyphens
     text = text.translate(_QUOTE_MARKS)
     text = _DASHES.sub("-", text)
-    text = _WHITESPACE.sub(" ", text)
-    return text.strip().lower()
+    text = _WHITESPACE.sub("", text)
+    return text.lower()
 
 
 def contains_evidence(chunk: Document, evidence: Evidence) -> bool:
-    """True if the chunk comes from the evidence's source and contains its quote."""
+    """True if the chunk comes from the evidence's source and contains its quote
+    (ignoring case, whitespace and cosmetic punctuation differences)."""
     if chunk.metadata.get("source") != evidence.source:
         return False
     return normalise(evidence.quote) in normalise(chunk.page_content)

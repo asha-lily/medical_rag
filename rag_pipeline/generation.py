@@ -15,8 +15,7 @@ _SYSTEM_PROMPT = """You are a helpful assistant that answers questions about ove
 
 Answer the question using only the context provided below. If the context does not contain enough information to answer the question confidently, say "I don't have enough information to answer that question based on the available documents."
 
-Do not make up information or draw on knowledge outside the provided context.
-Cite the source document and page number when you use specific information."""
+Do not make up information or draw on knowledge outside the provided context."""
 
 _HUMAN_TEMPLATE = """Context:
 {context}

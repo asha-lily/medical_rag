@@ -158,11 +158,11 @@ This dataset will be split into 2 subsets, which can be thought of as `training`
 - `training` data: I will run the evaluation pipeline on this data multiple times; at each iteration I'll manually review the results and make updates to the RAG pipeline in order to address any issues identified.
 - `test` data: this is 'unseen' data in the sense that I'm not making changes to the pipeline based on how it performs on this data. This should give us a better indication of 'real-world' performance, provided the data set is large and diverse enough.
 
-Given the manual work required to build this dataset, I'll keep it small for the first iteration, while acknowledging that if this system were to be deployed (especially in a medical setting), a large and diverse data set would be essential.
+Given the manual work required to build this dataset, I'll build a small training set to start with, while acknowledging that if this system were to be deployed (especially in a medical setting), a large and diverse test set would be essential. I'll need to be systematic about building the test set with representation across all medicine types and real-world scenarios, without bias towards the scenarios that I know the system performs well on. I think using an AI coding tool will be beneficial here!
 
 While building this dataset I decided to add some additional fields to each sample:
 
-- medicine (str): the name of the medicine that the question asks about. In future I could add an evaluation metric to check whether the sources cited in the answer come from the correct medicine document.
+- medicine (list[str]): the names of the medicines that the question asks about. In future I could add an evaluation metric to check whether the sources cited in the answer come from the correct medicine document.
 - category (enum): a label to help ensure good coverage of different topics. The categories currently include:      
     - `side_effects`
     - `out_of_scope_medicine`: i.e a medicine that we don't currently have a document for
@@ -171,6 +171,8 @@ While building this dataset I decided to add some additional fields to each samp
     - `pregnancy`
     - `suitable_conditions`: i.e asking whether a medicine can help with a specific condition
     - `combinations`: questions asking about whether multuple different medications can be taken together
+    - `not_suitable_for_patient`: the patient has a condition that is listed under 'do not take this medicine if you...' or similar
+    - `general`
 - answerable (bool): whether or not the question can be answered given the information in the documents
 
 I've also broken down the `evidence` field into:
@@ -181,7 +183,12 @@ I've also broken down the `evidence` field into:
 If there are multiple quotes relevant to a given sample, then the `evidence` field can contain multiple source-quote pairs.
 
 
-#### Ideas for pipeline improvements
+### Baseline results
+
+Now that I have a training set of 13 samples, I'll run my evaluation pipeline to calculate retrieval metrics (`run_retrieval_evaluation.py`) and RAGAS evaluation (`ragas_evaluation.py`) to get a set of baseline results. When I make changes to the system, I'll run evaluation again and compare the results to the baseline.
+
+
+### Ideas for pipeline improvements
 
 As mentioned above, the purpose of the training dataset is to surface issues with the pipeline. Issues identified in the latest iteration are listed below:
 

@@ -11,7 +11,17 @@ log = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_GROUND_TRUTH_SET_PATH = _PROJECT_ROOT / "data" / "ground_truth_dataset.yaml"
 
-RISK_LEVELS = ("high", "medium", "low")
+CATEGORIES = (
+    "side_effects",
+    "out_of_scope_medicine",
+    "breastfeeding",
+    "max_dose",
+    "pregnancy",
+    "suitable_conditions",
+    "combinations",
+    "not_suitable_for_patient",
+    "general",
+)
 
 
 @dataclass
@@ -20,16 +30,14 @@ class Evidence:
 
     source: str
     quote: str
-    essential: bool = False
 
 
 @dataclass
 class GroundTruthQuestion:
     id: str
     question: str
-    risk: str
     answerable: bool
-    medicine: str | None = None
+    medicine: list[str] | None = None
     category: str | None = None
     evidence: list[Evidence] = field(default_factory=list)
     reference_answer: str = ""
@@ -41,7 +49,6 @@ def _parse_entry(entry: dict) -> GroundTruthQuestion:
     return GroundTruthQuestion(
         id=entry["id"],
         question=entry["question"],
-        risk=entry["risk"],
         answerable=entry["answerable"],
         medicine=entry.get("medicine"),
         category=entry.get("category"),
@@ -59,9 +66,9 @@ def validate(questions: list[GroundTruthQuestion]) -> list[str]:
         if q.id in seen_ids:
             problems.append(f"{q.id}: duplicate id")
         seen_ids.add(q.id)
-        if q.risk not in RISK_LEVELS:
+        if q.category not in CATEGORIES:
             problems.append(
-                f"{q.id}: risk must be one of {RISK_LEVELS}, got {q.risk!r}"
+                f"{q.id}: category must be one of {CATEGORIES}, got {q.category!r}"
             )
         if q.answerable and not q.evidence:
             problems.append(f"{q.id}: answerable question has no evidence")

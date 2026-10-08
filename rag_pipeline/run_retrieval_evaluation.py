@@ -1,4 +1,4 @@
-"""Evaluate retrieval against the golden dataset.
+"""Evaluate retrieval against the ground truth dataset.
 
 uv run python -m rag_pipeline.run_retrieval_evaluation --check-only
 uv run python -m rag_pipeline.run_retrieval_evaluation --label baseline
@@ -18,12 +18,16 @@ from pathlib import Path
 import pandas as pd
 from langchain_core.documents import Document
 
-from rag_pipeline.golden_set import GoldenQuestion, load_golden_set
+from rag_pipeline.ground_truth_data_set import (
+    GroundTruthQuestion,
+    load_ground_truth_set,
+)
 from rag_pipeline.retrieval import retrieve
 from rag_pipeline.retrieval_metrics import (
     all_found_at_k,
     contains_evidence,
     evidence_ranks,
+    normalise,
     recall_at_k,
     reciprocal_rank,
 )
@@ -39,6 +43,12 @@ log = logging.getLogger(__name__)
 K_VALUES = (1, 3, 5, 10)
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 
+# Matching ignores whitespace, so a short quote can match across word
+# boundaries ("is not" matches inside "this not"). Longer quotes make a
+# false match very unlikely.
+MIN_QUOTE_CHARS = 20  # excluding whitespace
+MAX_EXPECTED_MATCHES = 2
+
 
 def _all_chunks(store) -> list[Document]:
     """Every chunk in the vector store, as Documents."""
@@ -50,12 +60,26 @@ def _all_chunks(store) -> list[Document]:
 
 
 def check_evidence_findable(
-    questions: list[GoldenQuestion], chunks: list[Document]
+    questions: list[GroundTruthQuestion], chunks: list[Document]
 ) -> set[str]:
-    """Log any evidence quote that isn't in any chunk; return the affected question IDs."""
+    """Log any evidence quote that isn't in any chunk; return the affected question IDs.
+
+    Also logs quotes that are short or match many chunks, which may be
+    matching in the wrong place. These are warnings only; the question is
+    still evaluated.
+    """
     unfindable = set()
     for q in questions:
         for ev in q.evidence:
+            quote = ev.quote.strip()
+            if len(normalise(quote)) < MIN_QUOTE_CHARS:
+                log.warning(
+                    "%s: quote is shorter than %d characters, so it may match "
+                    "in the wrong place; consider a longer quote: %r",
+                    q.id,
+                    MIN_QUOTE_CHARS,
+                    quote,
+                )
             n_matches = sum(contains_evidence(chunk, ev) for chunk in chunks)
             if n_matches == 0:
                 unfindable.add(q.id)
@@ -63,17 +87,26 @@ def check_evidence_findable(
                     "%s: quote not found in any chunk of %s: %r",
                     q.id,
                     ev.source,
-                    ev.quote,
+                    quote,
+                )
+            elif n_matches > MAX_EXPECTED_MATCHES:
+                log.warning(
+                    "%s: quote found in %d chunks of %s (expected at most %d); "
+                    "check it isn't repeated text or a false match: %r",
+                    q.id,
+                    n_matches,
+                    ev.source,
+                    MAX_EXPECTED_MATCHES,
+                    quote,
                 )
     return unfindable
 
 
-def evaluate_question(q: GoldenQuestion, retrieved: list[Document]) -> dict:
+def evaluate_question(q: GroundTruthQuestion, retrieved: list[Document]) -> dict:
     ranks = evidence_ranks(retrieved, q.evidence)
 
     row = {
         "id": q.id,
-        "risk": q.risk,
         "category": q.category,
         "n_evidence": len(q.evidence),
         "evidence_ranks": ranks,
@@ -85,18 +118,16 @@ def evaluate_question(q: GoldenQuestion, retrieved: list[Document]) -> dict:
 
 
 def summarise(results: pd.DataFrame) -> pd.DataFrame:
-    """Mean of each metric, overall and by risk level."""
+    """Mean of each metric"""
     metric_cols = ["reciprocal_rank"] + [f"recall@{k}" for k in K_VALUES]
     numeric = results[metric_cols].astype(float)
     overall = numeric.mean().to_frame("all").T
-    by_risk = numeric.groupby(results["risk"]).mean()
-    summary = pd.concat([overall, by_risk])
-    summary.insert(
+    overall.insert(
         0,
         "n_questions",
-        [len(results)] + results["risk"].value_counts().reindex(by_risk.index).tolist(),
+        [len(results)],
     )
-    return summary.rename(columns={"reciprocal_rank": "MRR"})
+    return overall.rename(columns={"reciprocal_rank": "MRR"})
 
 
 def run_retrieval_evaluation(label: str, check_only: bool) -> None:
@@ -105,7 +136,7 @@ def run_retrieval_evaluation(label: str, check_only: bool) -> None:
             "Vector store not found. Run `uv run python -m rag_pipeline.run_indexing` first."
         )
 
-    questions = load_golden_set()
+    questions = load_ground_truth_set()
     answerable = [q for q in questions if q.answerable]
     log.info(
         "Loaded %d questions (%d answerable, %d unanswerable).",
