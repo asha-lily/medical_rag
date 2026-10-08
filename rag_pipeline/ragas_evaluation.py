@@ -8,11 +8,9 @@ from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import AnswerRelevancy, Faithfulness
 
-from rag_pipeline.config import EmbeddingModelConfig, GenerationConfig, RAGASConfig
+from rag_pipeline.config import EmbeddingModelConfig, RAGASConfig
 
 log = logging.getLogger(__name__)
-
-ragas_config = RAGASConfig()
 
 
 def _make_ragas_llm(config: RAGASConfig) -> LangchainLLMWrapper:
@@ -23,6 +21,7 @@ def _make_ragas_llm(config: RAGASConfig) -> LangchainLLMWrapper:
             num_predict=config.max_tokens,
             temperature=config.temperature,
             reasoning=config.reasoning_level,
+            num_ctx=config.context_window,
         )
     )
 
@@ -36,15 +35,11 @@ def _make_ragas_embeddings(config: EmbeddingModelConfig) -> LangchainEmbeddingsW
     return LangchainEmbeddingsWrapper(emb)
 
 
-def build_metrics(
-    ragas_config: RAGASConfig | None = None,
-    emb_config: EmbeddingModelConfig | None = None,
+def _build_metrics(
+    ragas_config: RAGASConfig,
+    emb_config: EmbeddingModelConfig,
 ) -> list:
     """Return RAGAS metrics configured to use the local Ollama model & HuggingFace embeddings."""
-    if ragas_config is None:
-        ragas_config = RAGASConfig()
-    if emb_config is None:
-        emb_config = EmbeddingModelConfig()
     ragas_llm = _make_ragas_llm(ragas_config)
     ragas_embeddings = _make_ragas_embeddings(emb_config)
     return [
@@ -68,6 +63,11 @@ def evaluate_rag_samples(
     Optionally:
         ground_truth (str) — needed for context_precision / context_recall metrics
     """
+    if ragas_config is None:
+        ragas_config = RAGASConfig()
+    if emb_config is None:
+        emb_config = EmbeddingModelConfig()
+
     ragas_samples = [
         SingleTurnSample(
             user_input=s["question"],
@@ -83,6 +83,6 @@ def evaluate_rag_samples(
         timeout=ragas_config.timeout_seconds,
         max_workers=ragas_config.max_workers,
     )
-    metrics = build_metrics(ragas_config, emb_config)
+    metrics = _build_metrics(ragas_config, emb_config)
     log.info("Running RAGAS on %d samples with %d metrics.", len(samples), len(metrics))
     return evaluate(dataset, metrics=metrics, run_config=run_config)

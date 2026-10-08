@@ -39,6 +39,7 @@ class RetrievalConfig:
 class GenerationConfig:
     model_name: str = "llama3.2"
     max_tokens: int = 1024
+    temperature: float = 0.0
 
 
 @dataclass
@@ -51,6 +52,7 @@ class RAGASConfig:
     # Needs to cover judge reasoning & output JSONs
     max_tokens: int = 4096
     reasoning_level: ReasoningSetting = "low"
+    context_window: int = 20000
 
     # Number of requests that can be processed in parallel is limited by my laptop's processing power
     max_workers: int = 2

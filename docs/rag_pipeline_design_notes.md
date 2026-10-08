@@ -50,6 +50,8 @@
 
     *Choose which LLM is most suitable, temperature, response schema / structured output format*
 
+By default, temperature is set to 0.8 by Ollama. I want to set the temperature to 0 to minimise the variation in ouputs from run to run.
+
 ### 10. Evaluation
 - retrieval quality: precision, recall@k, MRR
     - these can be calculated by manually labelling a golden dataset of queries mapped to relevant document IDs
@@ -74,7 +76,7 @@ Another implication of using LLM-as-a-judge for evaluation is the cost and laten
 
 ##### Context window size
 
-We've briefly discussed the token limit. With Ollama models, there's also a context window cap set by the `num_ctx` parameter. By default this is...
+We've briefly discussed the token limit. With Ollama models, there's also a context window cap set by the `num_ctx` parameter. By default this is 4000.
 
 The context window will contain:
 - the prompt for the LLM judge: this is a fixed template written by RAGAS, containing an instruction, a JSON schema for the expected output, and few-shot examples (these are general, not specific to my domain).

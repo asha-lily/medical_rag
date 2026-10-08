@@ -51,7 +51,11 @@ def create_rag_chain(
     if config is None:
         config = GenerationConfig()
 
-    llm = ChatOllama(model=config.model_name, num_predict=config.max_tokens)
+    llm = ChatOllama(
+        model=config.model_name,
+        num_predict=config.max_tokens,
+        temperature=config.temperature,
+    )
 
     answer_chain = (
         RunnablePassthrough.assign(context=lambda x: _format_context(x["docs"]))
