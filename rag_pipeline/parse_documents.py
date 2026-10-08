@@ -8,6 +8,7 @@ from docling.datamodel.pipeline_options import (
 )
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.labels import DocItemLabel
+from docling_core.types.doc import TableItem
 from langchain_core.documents import Document
 
 _pipeline_options = PdfPipelineOptions()
@@ -34,7 +35,11 @@ def parse_document(document_path: Path) -> list[Document]:
     sections = []
     current = None
     for item, _level in docling_doc.iterate_items():
-        text = getattr(item, "text", "")
+        if isinstance(item, TableItem):
+            text = item.export_to_markdown(docling_doc)
+        else:
+            text = getattr(item, "text", "")
+
         page = item.prov[0].page_no if item.prov else None
         if item.label in (DocItemLabel.TITLE, DocItemLabel.SECTION_HEADER):
             current = {"heading": text, "text": "", "page": page}
