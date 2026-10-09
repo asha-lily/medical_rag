@@ -105,41 +105,7 @@ Sources:
 ```
 
 
-
-### Evaluation metrics
-
-#### Retrieval Quality
-
-For a given query, we can identify the ID(s) of the chunk(s) containing relevant information to answer the query. The retriever returns the K chunks that are most semantically similar to the query. [Common metrics](https://www.evidentlyai.com/llm-guide/rag-evaluation) related to this include:
-
-- Precision@k: of the top k retrieved items, how many are actually relevant?
-- Recall@k: of all relevant items, how many were retrieved in the top k?
-- Hit rate: Did at least one relevant item appear in the top k? (yes/no)
-- NDCG@k (Normalized Discounted Cumulative Gain): rewards correct items appearing higher in rank
-- MRR (mean reciprocal rank): inverse of the rank of the first relevant chunk among all retrieved chunks.
-
-Since safety is a priority, recall@k is a good metric as it will reflect the number of relevant chunks that retrieval misses. Missing a chunk translates to missing potentially important information.
-
-MRR tells us whether the most useful chunk was retrieved as one of the most important. This relates to ranking, so when making changes such as adding a re-ranker, changes in ranking will be reflected in MRR.
-
-
-
-#### Answer relevancy 
-
-The RAGAS prompt template for answer relevancy asks the judge to mark "evasive, vague" answers like "I don't know" as noncommittal: 1. In RAGAS's code, the score is then multiplied by zero when all 3 generated questions are marked noncommittal.
-
-That means a correct refusal scores 0 on answer relevancy. For example, the ibuprofen test case, where the system rightly said it didn't have enough information, would score 0.
-
-In this project, refusing is often the safe and correct behaviour, but the metric penalises this. 
-
-When building the ground truth dataset, I should:
-
-- Label which questions should be refused.
-- Report answer relevancy only on questions that should be answered.
-- Separately, measure refusal accuracy: did the system refuse when it should have, and answer when it should have?
-
-
-### Building a ground truth data set
+# Building a ground truth data set
 
 I'll build a dataset of ground truth samples, where each sample contains the following:
 
@@ -183,9 +149,72 @@ I've also broken down the `evidence` field into:
 If there are multiple quotes relevant to a given sample, then the `evidence` field can contain multiple source-quote pairs.
 
 
-### Baseline results
+# Evaluation metrics
+
+## Retrieval Quality
+
+For a given query, we can identify the ID(s) of the chunk(s) containing relevant information to answer the query. The retriever returns the K chunks that are most semantically similar to the query. [Common metrics](https://www.evidentlyai.com/llm-guide/rag-evaluation) related to this include:
+
+- Precision@k: of the top k retrieved items, how many are actually relevant?
+- Recall@k: of all relevant items, how many were retrieved in the top k?
+- Hit rate: Did at least one relevant item appear in the top k? (yes/no)
+- NDCG@k (Normalized Discounted Cumulative Gain): rewards correct items appearing higher in rank
+- MRR (mean reciprocal rank): inverse of the rank of the first relevant chunk among all retrieved chunks.
+
+Since safety is a priority, recall@k is a good metric as it will reflect the number of relevant chunks that retrieval misses. Missing a chunk translates to missing potentially important information.
+
+MRR tells us whether the most useful chunk was retrieved as one of the most important. This relates to ranking, so when making changes such as adding a re-ranker, changes in ranking will be reflected in MRR.
+
+
+## RAGAS: Answer relevancy & Faithfulness
+
+`Answer relevancy` and `faithfulness` are defined in `notes/rag_pipeline_design_notes.md`, along with the reasoning behind the choice of RAGAS LLM judge and other parameters.
+
+The RAGAS prompt template for answer relevancy asks the judge to mark "evasive, vague" answers like "I don't know" as non-committal, and assigns a score of 0. We don't want to penalise refusal, as it's important that this system refuses to answer when it can't find relevant information in the documents, instead of making something up or misinterpreting the documents.
+
+This is why each ground truth sample has an `answerable` field, which is `false` when the question can't be answered using information in the documents. In such cases, the generation model should refuse to answer the question. The prompt (the baseline version, at least) addresses this specifically by saying:
+
+```
+If the context does not contain enough information to answer the question confidently, say "I don't have enough information to answer that question based on the available documents."
+```
+
+In the evaluation pipeline, currently only samples for which `answerable` is `true` are sent to RAGAS. We need to measure refusal rate separately, i.e for all of the unanswerable questions in the ground truth dataset, for what % does the system refuse to answer? 
+
+We also want to measure how often the model is overly cautious and refuses to answer questions that are answerable; we'll call this `false refusal rate`. Since samples that are answerable currently get sent to RAGAS, if they're refused they'll get an answer relevancy score of 0, which is fair since it's a failure. When calculating faithfulness, RAGAS splits the answer into factual statements. When the model refuses, we expect the answer to look something like *I don't have enough information to answer that question...*, which would likely get a low faithfulness score due to the absence of similar meaning in the documents. If the output is empty then the faithfulness score is `NaN`. A `NaN` result can also happen due to an LLM judge call timing out or returning a JSON that can't be parsed (e.g due to the context window being too small); this is something to consider in the future.
+
+The third case is when a question is unanswerable but the model answers. We could call these cases `missed refusals`, and calculate `missed refusal rate` as `1 - refusal rate`. We also don't want to send these to RAGAS.
+
+If we can classify whether or not an answer is a refusal, we can make sure we only send samples that are both answerable and answered to RAGAS. With the other samples, we can calculate `refusal rate`, `false refusal rate` and `missed refusal rate`.
+
+
+### Classifying refusals
+
+So, how can we build such a classifier?
+
+#### Option 1
+
+I think the quickest method is for me to manually review answers and label whether or not they are refusals. This means I need to separate out running the RAG pipeline on my ground truth dataset, and calculating metrics. Between these two steps I'll add my manual labels, which will be a new `refusal` column that I'll label as true/false.
+
+How should I handle ambiguous cases, which aren't clear refusals but also aren't clear answers? For example "the leaflet doesn't mention X, but it does say Y...". If the question were asking about X, then I think I'd label this as a refusal.
+
+I think this method is the correct choice for the MVP phase where I'm working with a small, manageable dataset, but of course this method won't scale. See the next two options.
+
+I also considered automatically checking whether "I don't have enough information to answer that" appears in the answer, however I've seen refusals that use slightly different wording.
+
+#### Option 2
+
+I could configure the generation model to return a structured output, with an `answered` field which must be set to true or false. The challenge with this is that the `answered` field might disagree with the answer itself, so I'd still need to do some manual labelling in order to measure this alignment.
+
+#### Option 3
+
+I could of course train a classifier, for example a linear probe on top of a text encoder, but this would require a lot of labelled data. I could revisit this type of method in the future.
+
+
+# Baseline results
 
 Now that I have a training set of 13 samples, I'll run my evaluation pipeline to calculate retrieval metrics (`run_retrieval_evaluation.py`) and RAGAS evaluation (`ragas_evaluation.py`) to get a set of baseline results. When I make changes to the system, I'll run evaluation again and compare the results to the baseline.
+
+The results from this run are saved in `results/retrieval_baseline.csv`.
 
 
 ### Ideas for pipeline improvements
