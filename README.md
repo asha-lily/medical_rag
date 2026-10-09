@@ -1,10 +1,10 @@
 This project is a work in progress.
 
-This project builds a RAG pipeline for UK medicine leaflets
+This project builds a RAG pipeline for UK medicine leaflets.
 
 ### Disclaimer
 
-*It's crucial to note that the aim of this project is not to build an accurate, safe system that can be relied on, but rather to explore the challenges associated with applying RAG and agentic behaviour to a relatively simple and constrained health-related problem space.*
+*It's crucial to note that the aim of this project is not to build a fully functional, safe system that can be relied on, but rather to explore the challenges associated with applying RAG and agentic behaviour to a relatively simple and constrained health-related problem space.*
 
 # About this project
 
@@ -12,7 +12,7 @@ I'm interested in how AI is being used in healthcare, and how it might be used i
 
 One such application is chatbots designed to answer health and medicine-related questions. These already exist.
 
-This use-case initially struck me as very risky, and in need of very thorough evaluation and strict guardrails to minimise potential harm to users. Returning the wrong dose, or hallucinating a seemingly minor detail could be deadly. As chatbots become agentic, with access to tools and the ability to autonomously carry out multiple actions, the risks multiply.
+This use-case initially struck me as very risky, and in need of very thorough evaluation and strict guardrails to minimise potential harm to users. Returning the wrong dose, or hallucinating a seemingly minor detail could be deadly. As chatbots become agentic, with access to tools and the ability to autonomously carry out multiple actions, the risks multiply, and observability and evaluation need to keep up.
 
 My curiosity about the potential benefits of using AI in healthcare, and the challenges of doing this safely, motivates this project. 
 
@@ -26,6 +26,10 @@ I'm setting out with the following plan:
 
 - [ ] Build a simple RAG pipeline that can answer questions by retrieving relevant information from patient information leaflets.
 - [ ] Evaluate this pipeline on basic metrics, including using RAGAS with an LLM judge to evaluate faithfulness and answer relevancy.
+- [ ] Measure alignment between the RAGAS LLM judge and human labels. Compare different LLM judges.
+- [ ] Iteratively make improvements to the system based on the evaluation results.
+
+## Potential future work
 - [ ] Build a second retriever with access to a vector store of medical guideline documents. 
     - Where PILs address the question of 'how to take a medicine safely', guidelines address 'what's the right treatment or care'
     - Providers of guidelines include [sign](https://www.sign.ac.uk/guidelines/pharmacological-management-of-migraine/) & the [WHO](https://www.who.int/publications/who-guidelines)
@@ -63,8 +67,6 @@ Ruff now runs automatically on staged files at every commit.
 
 Make sure the Ollama server is running (open the Ollama app, or run `ollama serve`) before running the RAG pipeline or evaluation.
 
-
-
 ## Running Indexing and question-answering
 
 `uv run python -m rag_pipeline.run_indexing`
@@ -72,3 +74,51 @@ Make sure the Ollama server is running (open the Ollama app, or run `ollama serv
 Once you've built the vector store of document chunks, you can generate an answer to your query:
 
 `uv run python -m rag_pipeline.run_rag "<question>"`
+
+# Baseline results
+
+I built a ground truth data set of 13 samples (question-answer pairs). This is just for initial testing; I'd want a much larger, diverse dataset split into training & test subsets to evaluate the system before it goes anywhere near production. For more details, see `docs/evaluation.md`.
+
+I built an evaluation pipeline (see `rag_pipeline/run_evaluation.py`) to calculate retrieval metrics (`run_retrieval_evaluation.py`) and RAGAS metrics (`ragas_evaluation.py`) and ran it on my ground truth dataset to get a set of baseline results.
+
+## Results visualisation
+
+The following visualisations were produced in `notebooks/results_visualisation.ipynb`.
+
+Note that for such a small dataset, these results don't tell us much about system performance. Instead of drawing conclusions, the purpose of this evaluation is to understand how we could interpret the results in the future and make changes to the system accordingly.
+
+### Retrieval performance
+
+![Retrieval metrics table for the baseline run](results/visualisations/baseline/retrieval_metrics_table.png)
+
+![Recall@k graph for the baseline run](results/visualisations/baseline/recall_at_k_graph.png)
+
+Recall only increases by 0.02 upon increased k from 3 to 5. This tells us that the relevant evidence that wasn't being retrieved when k=3 isn't even in the top 5 chunks. As hypothesised earlier, the problem could be that by taking whole sections as chunks, small pieces information (e.g a bullet point in a list of bullet points) get lost when the whole section is embedded.
+
+MRR at k=5 is ~0.5 for the current 13 samples. For 2 samples, there are no relevant chunks in the top 5 but for 3 samples all relevant chunks are in the top 5.
+
+### Refusals
+
+![Refusal outcomes for the baseline run](results/visualisations/baseline/refusals_confusion_matrix.png)
+
+No unanswerable questions were answered, but there were 4 false refusals, i.e the system refused to answer even though the question was labelled as answerable. This shows that the generation model is being overly cautious, which should be addressed to make the system more helpful. The fact that there were no missed refusals is desirable behaviour. 
+
+### RAGAS results
+
+![RAGAS metrics for the baseline run](results/visualisations/baseline/ragas_metrics.png)
+
+One of the samples scores 0 for answer relevance:
+
+- expected answer: *"The document states that cinnarizine tablets can make you drowsy, and if this happens, you should not drive or use any tools or machines."*
+- generated answer: *"According to the PIL, it is recommended that you do not drive or use any tools or machines if cinnarizine tablets make you drowsy. However, there is no specific information on when exactly you can resume driving after taking the medication. It's also worth noting that the PIL advises against taking more tablets than prescribed by your doctor and to take them after a meal, but it does not provide guidance on how long this restriction applies to driving or using machines."*
+
+I would say that the generated answer is correct, although the final sentence seems unncessary. Perhaps this is why RAGAS gives it a low score? 
+
+A different sample scores 0.5 for faithfulness:
+
+- expected answer: *"The document doesn't directly answer the question, but it does say that if symptoms persist for more than 7 days or worsen, you must see a doctor or pharmacist. Therefore, you should not keep taking the antacid without consulting a doctor or pharmacist."*
+- generated answer: *"Based on the information provided in section 2 of the PIL, if your symptoms persist for more than 7 days or worsen, you must see a doctor or pharmacist. Since your antacid hasn't helped after a week, it's recommended that you stop taking it and consult with your doctor or pharmacist."*
+
+I think the main difference between the ground truth label and generated answer is that the generated answer says "it's recommended that you stop taking it", which the document doesn't say explicitly, but I think that it's implied from. I'm not sure that this difference warrants a score of only 0.5.
+
+If I'm going to put any trust in these RAGAS metrics then I need to understand how they're being calculated and whether the LLM's judgement aligns with human judgement. Ideally I'd use domain experts with medical expertise to review judge outputs, measure alignment and compare alignment between different judge LLMs.
