@@ -1,6 +1,0 @@
-id,ingredients,product_type,rxcui,note
-acetaminophen_325mg_tab,acetaminophen,HUMAN OTC DRUG,313782,US regular strength
-acetaminophen_500mg_tab,acetaminophen,HUMAN OTC DRUG,198440,US extra strength and UK standard
-ibuprofen_200mg_tab,ibuprofen,HUMAN OTC DRUG,310965,standard OTC strength
-ibuprofen_800mg_tab,ibuprofen,HUMAN PRESCRIPTION DRUG,197807,common prescription strength
-warfarin_tab,warfarin,HUMAN PRESCRIPTION DRUG,855332,label usually covers all strengths
