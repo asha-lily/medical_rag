@@ -68,7 +68,7 @@ Note that RAGAS uses an LLM judge to calculate metrics. A potential source of bi
 
 Since RAGAS involves multiple reasoning steps, a reasonably powerful model should be used as the judge.
 
-Another constraint is compute power; I'm running models locally via Ollama. `gpt-oss:20b` meets all of these constraints, so I'll test this out first. I need to set `max_tokens` for the model. This needs to cover reasoning (which can be set to `low`, `medium` or `high`) and the JSONs that the judge outputs in order to calculate metrics. If `max_tokens` is too low, the JSONs might be incomplete, leading to a parsing error and `NaN` scores. Ideally we'd run some tests to see what range of token values RAGAS uses for our specific documents. For now, for the MVP, we'll set a high `max_tokens` value and revisit this if there are errors.
+Another constraint is compute power; I'm running models locally via Ollama, so need a model that will fit within local memory (16GB). `qwen3:8b ` meets all of these constraints, so I'll test this out first. I need to set `max_tokens` for the model. This needs to cover reasoning (which can be set to true or false) and the JSONs that the judge outputs in order to calculate metrics. If `max_tokens` is too low, the JSONs might be incomplete, leading to a parsing error and `NaN` scores. Ideally we'd run some tests to see what range of token values RAGAS uses for our specific documents. For now, for the MVP, we'll set a high `max_tokens` value and revisit this if there are errors.
 
 It's important to check that the LLM judge is aligned with what a human would say. To check for this alignment I'll need to manually label some examples and compare to the judge's decisions.
     

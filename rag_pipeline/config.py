@@ -46,14 +46,14 @@ class GenerationConfig:
 class RAGASConfig:
     """Define which LLM to use for RAGAS evaluation."""
 
-    model_name: str = "gpt-oss:20b"
+    model_name: str = "qwen3:8b"
     temperature: float = 0.0
 
     # Needs to cover judge reasoning & output JSONs
     max_tokens: int = 4096
-    reasoning_level: ReasoningSetting = "low"
-    context_window: int = 20000
+    reasoning_level: ReasoningSetting = False
+    context_window: int = 9000
 
     # Number of requests that can be processed in parallel is limited by my laptop's processing power
-    max_workers: int = 2
+    max_workers: int = 1
     timeout_seconds: int = 600

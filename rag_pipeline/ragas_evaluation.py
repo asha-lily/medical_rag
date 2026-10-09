@@ -3,6 +3,7 @@ import logging
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
+from langchain_core.callbacks import BaseCallbackHandler
 from ragas import EvaluationDataset, evaluate, RunConfig
 from ragas.dataset_schema import SingleTurnSample
 from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -14,6 +15,18 @@ from rag_pipeline.config import EmbeddingModelConfig, RAGASConfig
 log = logging.getLogger(__name__)
 
 
+class _LogTokenCounts(BaseCallbackHandler):
+    """Log Ollama's token counts for each judge call."""
+
+    def on_llm_end(self, response, **kwargs):
+        meta = response.generations[0][0].message.response_metadata
+        log.info(
+            "Judge call: prompt_eval_count=%s, eval_count=%s",
+            meta.get("prompt_eval_count"),
+            meta.get("eval_count"),
+        )
+
+
 def _make_ragas_llm(config: RAGASConfig) -> LangchainLLMWrapper:
     """Wrap a Langchain chat Ollama model in a RAGAS LLM interface."""
     return LangchainLLMWrapper(
@@ -23,6 +36,7 @@ def _make_ragas_llm(config: RAGASConfig) -> LangchainLLMWrapper:
             temperature=config.temperature,
             reasoning=config.reasoning_level,
             num_ctx=config.context_window,
+            callbacks=[_LogTokenCounts()],
         )
     )
 

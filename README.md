@@ -59,7 +59,7 @@ Ruff now runs automatically on staged files at every commit.
 
        ollama pull llama3.2
 
-       ollama pull gpt-oss:20b
+       ollama pull qwen3:8b
 
 Make sure the Ollama server is running (open the Ollama app, or run `ollama serve`) before running the RAG pipeline or evaluation.
 
