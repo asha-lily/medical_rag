@@ -1,13 +1,17 @@
 """Run retrieval and generation once over the ground truth set, then score both.
 
-uv run python -m rag_pipeline.all_evaluation --label baseline
-uv run python -m rag_pipeline.all_evaluation --from-run baseline   # re-score a saved run
-uv run python -m rag_pipeline.all_evaluation --label baseline --skip-ragas
+uv run python -m rag_pipeline.run_evaluation --label baseline --collect-only
+# ... manually label each record's "refusal" as true/false in results/run_baseline.json ...
+
+uv run python -m rag_pipeline.run_evaluation --from-run baseline   # score a saved run
+uv run python -m rag_pipeline.run_evaluation --from-run baseline --skip-ragas
 
 Collecting a run (retrieval + generation for every question) writes
-results/run_<label>.json. Retrieval metrics and RAGAS metrics are then computed
-from that file, so both describe exactly the same retrieved chunks and answers,
-and RAGAS (the slow part) can be re-run without regenerating answers.
+results/run_<label>.json, with "refusal": null on every record. Retrieval,
+refusal and RAGAS metrics are then computed from that file, so they all describe
+exactly the same retrieved chunks and answers, and RAGAS (the slow part) can be
+re-run without regenerating answers. Retrieval metrics don't need the refusal
+labels; refusal and RAGAS metrics do.
 """
 
 import argparse
@@ -58,6 +62,7 @@ GENERATION_K = RetrievalConfig().k_chunks_to_retrieve
 K_VALUES = tuple(k for k in (1, 3) if k < GENERATION_K) + (GENERATION_K,)
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
+RAGAS_METRICS = ("faithfulness", "answer_relevancy")
 
 
 def _all_chunks(store) -> list[Document]:
@@ -112,6 +117,8 @@ def collect_run(label: str) -> dict:
                 "answerable": q.answerable,
                 "reference_answer": q.reference_answer,
                 "answer": answer,
+                # Labelled by hand as true/false before scoring.
+                "refusal": None,
                 "docs": [_doc_to_dict(d) for d in docs],
             }
         )
@@ -170,13 +177,81 @@ def score_retrieval(run: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def score_ragas(run: dict) -> pd.DataFrame:
-    """RAGAS metrics for answerable questions only.
+def validate_refusal_labels(run: dict) -> None:
+    """Raise if any record's `refusal` label is missing or not true/false."""
+    bad = [
+        rec["id"] for rec in run["records"] if not isinstance(rec.get("refusal"), bool)
+    ]
+    if bad:
+        raise ValueError(
+            f"`refusal` must be true or false; missing or invalid for: {', '.join(bad)}"
+        )
 
-    AnswerRelevancy scores a refusal as 0, so unanswerable questions (where a
-    refusal is the right answer) would drag the average down for the wrong reason.
+
+def _outcome(answerable: bool, refusal: bool) -> str:
+    if answerable:
+        return "false_refusal" if refusal else "answered"
+    return "correct_refusal" if refusal else "missed_refusal"
+
+
+def _rate(numerator: int, denominator: int) -> float | None:
+    return numerator / denominator if denominator else None
+
+
+def score_refusals(run: dict) -> tuple[pd.DataFrame, dict]:
+    """Per-question refusal outcomes, plus refusal / missed / false refusal rates.
+
+    Expects validated labels (see `validate_refusal_labels`).
     """
-    records = [rec for rec in run["records"] if rec["answerable"]]
+    rows = [
+        {
+            "id": rec["id"],
+            "category": rec["category"],
+            "answerable": rec["answerable"],
+            "refusal": rec["refusal"],
+            "outcome": _outcome(rec["answerable"], rec["refusal"]),
+        }
+        for rec in run["records"]
+    ]
+    df = pd.DataFrame(
+        rows, columns=["id", "category", "answerable", "refusal", "outcome"]
+    )
+
+    unanswerable = df[~df["answerable"].astype(bool)]
+    answerable = df[df["answerable"].astype(bool)]
+    n_refused = int(unanswerable["refusal"].sum())
+    n_false = int(answerable["refusal"].sum())
+    refusal_rate = _rate(n_refused, len(unanswerable))
+    summary = {
+        "n_unanswerable": len(unanswerable),
+        "n_refused_unanswerable": n_refused,
+        "refusal_rate": refusal_rate,
+        "missed_refusal_rate": None if refusal_rate is None else 1 - refusal_rate,
+        "n_answerable": len(answerable),
+        "n_refused_answerable": n_false,
+        "false_refusal_rate": _rate(n_false, len(answerable)),
+    }
+    return df, summary
+
+
+def _format_rate(numerator: int, denominator: int) -> str:
+    if not denominator:
+        return "n/a (no questions)"
+    return f"{numerator}/{denominator} ({numerator / denominator:.0%})"
+
+
+def score_ragas(run: dict) -> pd.DataFrame:
+    """RAGAS metrics for questions that are answerable and were answered.
+
+    AnswerRelevancy scores a refusal as 0, so refusals are left out: correct
+    refusals are covered by the refusal rate, and refusals of answerable
+    questions by the false refusal rate. This means the number of questions
+    scored depends on the model's behaviour, so read these means alongside the
+    false refusal rate.
+    """
+    records = [
+        rec for rec in run["records"] if rec["answerable"] and not rec["refusal"]
+    ]
     samples = [
         {
             "question": rec["question"],
@@ -189,12 +264,37 @@ def score_ragas(run: dict) -> pd.DataFrame:
     result = evaluate_rag_samples(samples, RAGASConfig())
     df = result.to_pandas()
     df.insert(0, "id", [rec["id"] for rec in records])
+
+    for metric in RAGAS_METRICS:
+        missing = df.loc[df[metric].isna(), "id"].tolist()
+        if len(missing) == len(df):
+            raise RuntimeError(
+                f"Every {metric} score is NaN, so all judge calls probably failed. "
+                "Check the RAGAS log for exceptions."
+            )
+        if missing:
+            log.warning(
+                "%s is NaN for %d/%d questions (timeout or unparseable judge output?): %s",
+                metric,
+                len(missing),
+                len(df),
+                ", ".join(missing),
+            )
     return df
 
 
-def run_all_evaluation(label: str, from_run: str | None, skip_ragas: bool) -> None:
+def run_all_evaluation(
+    label: str, from_run: str | None, skip_ragas: bool, collect_only: bool = False
+) -> None:
     run = load_run(from_run) if from_run else collect_run(label)
     label = run["label"]
+
+    if collect_only:
+        print(
+            f"\nLabel each record's `refusal` as true/false in {_run_path(label)}, "
+            f"then run with --from-run {label}"
+        )
+        return
 
     retrieval = score_retrieval(run)
     retrieval_results_path = RESULTS_DIR / f"run_{label}_retrieval.csv"
@@ -205,12 +305,32 @@ def run_all_evaluation(label: str, from_run: str | None, skip_ragas: bool) -> No
     print(_summarise_retrieval(retrieval).round(2).to_string())
     print(f"Per-question results saved to {retrieval_results_path}")
 
+    validate_refusal_labels(run)
+    refusals, summary = score_refusals(run)
+    refusals_results_path = RESULTS_DIR / f"run_{label}_refusals.csv"
+    refusals.to_csv(refusals_results_path, index=False)
+    n_unans, n_ans = summary["n_unanswerable"], summary["n_answerable"]
+    n_refused, n_false = (
+        summary["n_refused_unanswerable"],
+        summary["n_refused_answerable"],
+    )
+    print("\n=== Refusal metrics ===")
+    print(f"Refusal rate:         {_format_rate(n_refused, n_unans)}")
+    print(f"Missed refusal rate:  {_format_rate(n_unans - n_refused, n_unans)}")
+    print(f"False refusal rate:   {_format_rate(n_false, n_ans)}")
+    missed = refusals.loc[refusals["outcome"] == "missed_refusal", "id"].tolist()
+    if missed:
+        print(f"Missed refusals: {', '.join(missed)}")
+    print(f"Per-question results saved to {refusals_results_path}")
+
     if skip_ragas:
         return
     ragas = score_ragas(run)
     ragas_results_path = RESULTS_DIR / f"run_{label}_ragas.csv"
     ragas.to_csv(ragas_results_path, index=False)
-    print(f"\n=== RAGAS metrics ({len(ragas)} answerable questions) ===")
+    print(f"\n=== RAGAS metrics ({len(ragas)} answerable, answered questions) ===")
+    for metric in RAGAS_METRICS:
+        print(f"{metric:<18} {ragas[metric].mean():.2f}  (n={ragas[metric].count()})")
     print(ragas[["faithfulness", "answer_relevancy"]].mean().round(2).to_string())
     print(f"Per-question results saved to {ragas_results_path}")
 
@@ -230,7 +350,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--skip-ragas",
         action="store_true",
-        help="Only compute retrieval metrics.",
+        help="Only compute retrieval and refusal metrics.",
+    )
+    parser.add_argument(
+        "--collect-only",
+        action="store_true",
+        help="Collect and save a run for refusal labelling, without scoring it.",
     )
     args = parser.parse_args()
-    run_all_evaluation(args.label, args.from_run, args.skip_ragas)
+    run_all_evaluation(args.label, args.from_run, args.skip_ragas, args.collect_only)

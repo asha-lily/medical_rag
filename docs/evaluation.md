@@ -168,7 +168,13 @@ MRR tells us whether the most useful chunk was retrieved as one of the most impo
 
 ## RAGAS: Answer relevancy & Faithfulness
 
-`Answer relevancy` and `faithfulness` are defined in `notes/rag_pipeline_design_notes.md`, along with the reasoning behind the choice of RAGAS LLM judge and other parameters.
+**Faithfulness:** whether the generated answer is actually supported by the retrieved information (i.e not hallucinating). Using the RAGAS framework this is calculated as the `number of claims supported by retrieved info` divided by `the total number of claims` (the answer is first broken down into 'claims')
+
+**Answer relevancy:** whether the answer actually addresses the question asked (penalises incomplete or off-topic answers, even if faithful). The RAGAS framework uses an LLM to generate synthetic questions that the answer could plausibly be answering, embeds them and calculates the cosine similarity between them and an embedding of the actual question.
+
+See `rag_pipeline_design_notes.md` for the reasoning behind the choice of RAGAS LLM judge and other parameters.
+
+### Handling refusals
 
 The RAGAS prompt template for answer relevancy asks the judge to mark "evasive, vague" answers like "I don't know" as non-committal, and assigns a score of 0. We don't want to penalise refusal, as it's important that this system refuses to answer when it can't find relevant information in the documents, instead of making something up or misinterpreting the documents.
 
@@ -178,16 +184,13 @@ This is why each ground truth sample has an `answerable` field, which is `false`
 If the context does not contain enough information to answer the question confidently, say "I don't have enough information to answer that question based on the available documents."
 ```
 
-In the evaluation pipeline, currently only samples for which `answerable` is `true` are sent to RAGAS. We need to measure refusal rate separately, i.e for all of the unanswerable questions in the ground truth dataset, for what % does the system refuse to answer? 
+Originally, the evaluation pipeline sent every sample for which `answerable` is `true` to RAGAS. We need to measure refusal rate separately, i.e for all of the unanswerable questions in the ground truth dataset, for what % does the system refuse to answer? 
 
 We also want to measure how often the model is overly cautious and refuses to answer questions that are answerable; we'll call this `false refusal rate`. Since samples that are answerable currently get sent to RAGAS, if they're refused they'll get an answer relevancy score of 0, which is fair since it's a failure. When calculating faithfulness, RAGAS splits the answer into factual statements. When the model refuses, we expect the answer to look something like *I don't have enough information to answer that question...*, which would likely get a low faithfulness score due to the absence of similar meaning in the documents. If the output is empty then the faithfulness score is `NaN`. A `NaN` result can also happen due to an LLM judge call timing out or returning a JSON that can't be parsed (e.g due to the context window being too small); this is something to consider in the future.
 
 The third case is when a question is unanswerable but the model answers. We could call these cases `missed refusals`, and calculate `missed refusal rate` as `1 - refusal rate`. We also don't want to send these to RAGAS.
 
 If we can classify whether or not an answer is a refusal, we can make sure we only send samples that are both answerable and answered to RAGAS. With the other samples, we can calculate `refusal rate`, `false refusal rate` and `missed refusal rate`.
-
-
-### Classifying refusals
 
 So, how can we build such a classifier?
 
@@ -198,6 +201,8 @@ I think the quickest method is for me to manually review answers and label wheth
 How should I handle ambiguous cases, which aren't clear refusals but also aren't clear answers? For example "the leaflet doesn't mention X, but it does say Y...". If the question were asking about X, then I think I'd label this as a refusal.
 
 I think this method is the correct choice for the MVP phase where I'm working with a small, manageable dataset, but of course this method won't scale. See the next two options.
+
+**Implemented.** `run_evaluation --collect-only` saves the run with `"refusal": null` on every record. I label each one by hand, then `--from-run <label>` validates the labels (each must be `true` or `false`), computes the three refusal rates (printed as counts, e.g. `2/3 (67%)`), and sends only answerable, answered samples to RAGAS. One consequence: the number of samples RAGAS scores now depends on the model's behaviour. If a change makes the model refuse more of the hard answerable questions, faithfulness could go *up* while the system gets worse, so RAGAS means should always be read next to the false refusal rate.
 
 I also considered automatically checking whether "I don't have enough information to answer that" appears in the answer, however I've seen refusals that use slightly different wording.
 
@@ -214,7 +219,35 @@ I could of course train a classifier, for example a linear probe on top of a tex
 
 Now that I have a training set of 13 samples, I'll run my evaluation pipeline to calculate retrieval metrics (`run_retrieval_evaluation.py`) and RAGAS evaluation (`ragas_evaluation.py`) to get a set of baseline results. When I make changes to the system, I'll run evaluation again and compare the results to the baseline.
 
-The results from this run are saved in `results/retrieval_baseline.csv`.
+The results from this run are saved in:
+
+- `results/run_baseline_retrieval.csv`: recall@k and reciprocal rank metrics
+- `results/run_baseline_refusals.csv`: whether each sample was answered / a correct refusal or false refusal
+- `results/run_baseline_ragas.csv`: faithfulness & answer relevancy metrics
+
+## Results visualisation
+
+The following visualisations were produced in `notebooks/results_visualisation.ipynb`.
+
+Note that for such a small dataset, these results don't tell us much about system performance. Instead of drawing conclusions, the purpose of this system is to understand how we could interpret the results in the future and make changes to the system accordingly.
+
+### Retrieval performance
+
+![Refusal outcomes for the baseline run](../results/visualisations/baseline/retrieval_metrics_table.png)
+
+![Refusal outcomes for the baseline run](../results/visualisations/baseline/recall_at_k_graph.png)
+
+Recall only increases by 0.02 upon increased k from 3 to 5. This tells us that the relevant evidence that wasn't being retrieved when k=3 isn't even in the top 5 chunks. As hypothesised earlier, the problem could be that by taking whole sections as chunks, small pieces information (e.g a bullet point in a list of bullet points) get lost when the whole section is embedded.
+
+MRR at k=5 is ~0.5 for the current 13 samples. For 2 samples, there are no relevant chunks in the top 5 but for 3 samples all relevant chunks are in the top 5.
+
+### Refusals
+
+![Refusal outcomes for the baseline run](../results/visualisations/baseline/refusals_confusion_matrix.png)
+
+No unanswerable questions were answered, but there were 4 false refusals, i.e the system refused to answer even though the question was labelled as answerable. This shows that the generation model is being overly cautious, which should be addressed to make the system more helpful. The fact that there were no missed refusals is desirable behaviour. 
+
+
 
 
 ### Ideas for pipeline improvements

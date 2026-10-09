@@ -1,3 +1,4 @@
+import ollama
 import logging
 
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -48,6 +49,20 @@ def _build_metrics(
     ]
 
 
+def require_ollama_model(model_name: str) -> None:
+    """Fail fast if Ollama isn't running or the model hasn't been pulled."""
+    try:
+        ollama.Client().show(model_name)
+    except ollama.ResponseError as e:
+        if e.status_code == 404:
+            raise RuntimeError(
+                f"Ollama model {model_name!r} not found. Run `ollama pull {model_name}`."
+            ) from e
+        raise
+    except ConnectionError as e:
+        raise RuntimeError("Can't reach Ollama. Is `ollama serve` running?") from e
+
+
 def evaluate_rag_samples(
     samples: list[dict],
     ragas_config: RAGASConfig | None = None,
@@ -67,6 +82,8 @@ def evaluate_rag_samples(
         ragas_config = RAGASConfig()
     if emb_config is None:
         emb_config = EmbeddingModelConfig()
+
+    require_ollama_model(ragas_config.model_name)
 
     ragas_samples = [
         SingleTurnSample(

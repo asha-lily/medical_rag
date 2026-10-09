@@ -56,9 +56,9 @@ By default, temperature is set to 0.8 by Ollama. I want to set the temperature t
 - retrieval quality: precision, recall@k, MRR
     - these can be calculated by manually labelling a golden dataset of queries mapped to relevant document IDs
 - generation quality: faithfulness/groundedness, answer relevance, hallucination rate
-    - faithfulness: whether the generated answer is actually supported by the retrieved information (i.e not hallucinating). Using the RAGAS framework this is calculated as the `number of claims supported by retrieved info` divided by `the total number of claims` (the answer is first broken down into 'claims')
-    - answer relevance: whether the answer actually addresses the question asked (penalises incomplete or off-topic answers, even if faithful). The RAGAS framework uses an LLM to generate synthetic questions that the answer could plausibly be answering, embeds them and calculates the cosine similarity between them and an embedding of the actual question.
 - frameworks: RAGAS, DeepEval
+
+See `evaluation.md` for more details on the choice of metrics and how they're implemented.
 
 #### Choosing an LLM judge for RAGAS
 
