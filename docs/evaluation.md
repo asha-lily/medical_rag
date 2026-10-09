@@ -233,9 +233,9 @@ Note that for such a small dataset, these results don't tell us much about syste
 
 ### Retrieval performance
 
-![Refusal outcomes for the baseline run](../results/visualisations/baseline/retrieval_metrics_table.png)
+![Retrieval metrics table for the baseline run](../results/visualisations/baseline/retrieval_metrics_table.png)
 
-![Refusal outcomes for the baseline run](../results/visualisations/baseline/recall_at_k_graph.png)
+![Recall@k graph for the baseline run](../results/visualisations/baseline/recall_at_k_graph.png)
 
 Recall only increases by 0.02 upon increased k from 3 to 5. This tells us that the relevant evidence that wasn't being retrieved when k=3 isn't even in the top 5 chunks. As hypothesised earlier, the problem could be that by taking whole sections as chunks, small pieces information (e.g a bullet point in a list of bullet points) get lost when the whole section is embedded.
 
@@ -247,7 +247,25 @@ MRR at k=5 is ~0.5 for the current 13 samples. For 2 samples, there are no relev
 
 No unanswerable questions were answered, but there were 4 false refusals, i.e the system refused to answer even though the question was labelled as answerable. This shows that the generation model is being overly cautious, which should be addressed to make the system more helpful. The fact that there were no missed refusals is desirable behaviour. 
 
+### RAGAS results
 
+![RAGAS metrics for the baseline run](../results/visualisations/baseline/ragas_metrics.png)
+
+One of the samples scores 0 for answer relevance:
+
+- expected answer: *"The document states that cinnarizine tablets can make you drowsy, and if this happens, you should not drive or use any tools or machines."*
+- generated answer: *"According to the PIL, it is recommended that you do not drive or use any tools or machines if cinnarizine tablets make you drowsy. However, there is no specific information on when exactly you can resume driving after taking the medication. It's also worth noting that the PIL advises against taking more tablets than prescribed by your doctor and to take them after a meal, but it does not provide guidance on how long this restriction applies to driving or using machines."*
+
+I would say that the generated answer is correct, although the final sentence seems unncessary. Perhaps this is why RAGAS gives it a low score? 
+
+A different sample scores 0.5 for faithfulness:
+
+- expected answer: *"The document doesn't directly answer the question, but it does say that if symptoms persist for more than 7 days or worsen, you must see a doctor or pharmacist. Therefore, you should not keep taking the antacid without consulting a doctor or pharmacist."*
+- generated answer: *"Based on the information provided in section 2 of the PIL, if your symptoms persist for more than 7 days or worsen, you must see a doctor or pharmacist. Since your antacid hasn't helped after a week, it's recommended that you stop taking it and consult with your doctor or pharmacist."*
+
+I think the main difference between the ground truth label and generated answer is that the generated answer says "it's recommended that you stop taking it", which the document doesn't say explicitly, but I think that it's implied from. I'm not sure that this difference warrants a score of only 0.5.
+
+If I'm going to put any trust in these RAGAS metrics then I need to understand how they're being calculated and whether the LLM's judgement aligns with human judgement. Ideally I'd use domain experts with medical expertise to review judge outputs, measure alignment and compare alignment between different judge LLMs.
 
 
 ### Ideas for pipeline improvements

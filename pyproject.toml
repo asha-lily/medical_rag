@@ -25,6 +25,7 @@ dependencies = [
     "ragas>=0.2.0",
     "requests>=2.34.2",
     "docling>=2.130.0",
+    "matplotlib>=3.11.2",
 ]
 
 [dependency-groups]
