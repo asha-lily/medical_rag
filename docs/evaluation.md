@@ -256,7 +256,7 @@ One of the samples scores 0 for answer relevance:
 - expected answer: *"The document states that cinnarizine tablets can make you drowsy, and if this happens, you should not drive or use any tools or machines."*
 - generated answer: *"According to the PIL, it is recommended that you do not drive or use any tools or machines if cinnarizine tablets make you drowsy. However, there is no specific information on when exactly you can resume driving after taking the medication. It's also worth noting that the PIL advises against taking more tablets than prescribed by your doctor and to take them after a meal, but it does not provide guidance on how long this restriction applies to driving or using machines."*
 
-I would say that the generated answer is correct, although the final sentence seems unncessary. Perhaps this is why RAGAS gives it a low score? 
+I would say that the generated answer is correct, although the final sentence seems unnecessary. Perhaps this is why RAGAS gives it a low score? 
 
 A different sample scores 0.5 for faithfulness:
 
@@ -275,10 +275,3 @@ As mentioned above, the purpose of the training dataset is to surface issues wit
 - To reduce the risk of retrieving information from the wrong PIL, I could add a classification step (i.e identify which medicine the query is asking about) and filter the chunks that can be retrieved from to those for the specific medicine.
     - Users may ask questions using brand names instead of the generic medicine name, so I could create mappings from brand names to medicine names to use in this classification step.
     - Users may misspell the medicine name. In test case 3 we saw how this can affect retrieval. The classification step could use fuzzy matching to identify the correct medicine name.
-
-
-### Next steps
-
-- Run evaluation pipeline to calculate metrics
-- Run RAGAS evaluation
-- Manually inspect what went wrong and propse changes to the RAG pipeline to address these issues

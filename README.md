@@ -6,6 +6,41 @@ This project builds a RAG pipeline for UK medicine leaflets.
 
 *It's crucial to note that the aim of this project is not to build a fully functional, safe system that can be relied on, but rather to explore the challenges associated with applying RAG and agentic behaviour to a relatively simple and constrained health-related problem space.*
 
+# Repository structure
+
+```
+medical_rag/
+├── rag_pipeline/                     # Source code for the pipeline and its evaluation
+│   ├── config.py                     # All settings: chunking, embedding, retrieval, generation and judge
+│   ├── parse_documents.py            # PDF → sections, using Docling's layout-aware parsing
+│   ├── chunking.py                   # Sections → chunks, with medicine name and section heading added
+│   ├── vector_store.py               # Build a Chroma vector store
+│   ├── retrieval.py                  # Embeds a query and returns the top-k chunks
+│   ├── generation.py                 # Prompt and LLM chain that answers from the retrieved chunks
+│   ├── run_indexing.py               # Entry point: parse, chunk, embed and store the leaflets
+│   ├── run_rag.py                    # Entry point: answer a single question
+│   ├── ground_truth_data_set.py      # Loads and validates the ground truth set
+│   ├── retrieval_metrics.py          # Recall@k and MRR, matched on evidence quotes
+│   ├── ragas_evaluation.py           # RAGAS faithfulness and answer relevancy, using a local judge
+│   └── run_evaluation.py             # Entry point: run the pipeline on the ground truth set and score it
+├── data/
+│   ├── ground_truth_dataset.yaml     # Hand-labelled questions, evidence quotes and reference answers
+│   └── PILs/                         # Leaflet PDFs (not committed; see docs/project_intro.md)
+├── docs/
+│   ├── project_intro.md              # Motivation, how the leaflets were chosen, and licensing
+│   ├── rag_pipeline_design_notes.md  # Design decisions for each pipeline component
+│   └── evaluation.md                 # Evaluation approach, choice of metrics and detailed results
+├── notebooks/                        # Exploration behind the design decisions
+│   ├── parsing_and_chunking_exploration.ipynb
+│   ├── embeddings_exploration.ipynb
+│   ├── vector_store_exploration.ipynb
+│   └── results_visualisation.ipynb   
+└── results/                          # Per-question results and charts for each evaluation run
+    └── visualisations/baseline/
+```
+
+**Where to start:** `docs/evaluation.md` explains how the system is evaluated and what the baseline showed.
+
 # About this project
 
 I'm interested in how AI is being used in healthcare, and how it might be used in the future.
@@ -24,8 +59,9 @@ A system like this could be useful to the average person who may have over-the-c
 
 I'm setting out with the following plan:
 
-- [ ] Build a simple RAG pipeline that can answer questions by retrieving relevant information from patient information leaflets.
-- [ ] Evaluate this pipeline on basic metrics, including using RAGAS with an LLM judge to evaluate faithfulness and answer relevancy.
+- [x] Build a simple RAG pipeline that can answer questions by retrieving relevant information from patient information leaflets.
+- [x] Evaluate this pipeline on basic metrics, including using RAGAS with an LLM judge to evaluate faithfulness and answer relevancy.
+- [ ] Add tests, prompt & experiment tracking
 - [ ] Measure alignment between the RAGAS LLM judge and human labels. Compare different LLM judges.
 - [ ] Iteratively make improvements to the system based on the evaluation results.
 
@@ -45,7 +81,7 @@ See `data/PILs`. I'm starting off with a set of 10 PILs for 10 common over-the-c
 
 An important note at this stage is that there's a lot of variety in the format of PILs from different providers. To build a robust RAG system I would want to sample from a diverse range of formats and make sure the parsing step works for all of them. For the MVP stage of this project I'm intentionally using a small dataset so that I can inspect them manually, and while I've tried to select a range of PIL formats, the small dataset size means that this diversity will be limited.
 
-For more details on the dataset and the plan for this project, see `notebooks/project_intro.md`.
+For more details on the dataset and the plan for this project, see `docs/project_intro.md`.
 
 # Setup
 
@@ -79,7 +115,7 @@ Once you've built the vector store of document chunks, you can generate an answe
 
 I built a ground truth data set of 13 samples (question-answer pairs). This is just for initial testing; I'd want a much larger, diverse dataset split into training & test subsets to evaluate the system before it goes anywhere near production. For more details, see `docs/evaluation.md`.
 
-I built an evaluation pipeline (see `rag_pipeline/run_evaluation.py`) to calculate retrieval metrics (`run_retrieval_evaluation.py`) and RAGAS metrics (`ragas_evaluation.py`) and ran it on my ground truth dataset to get a set of baseline results.
+I built an evaluation pipeline (see `rag_pipeline/run_evaluation.py`) to calculate retrieval metrics and RAGAS metrics and ran it on my ground truth dataset to get a set of baseline results.
 
 ## Results visualisation
 
@@ -112,7 +148,7 @@ One of the samples scores 0 for answer relevance:
 - expected answer: *"The document states that cinnarizine tablets can make you drowsy, and if this happens, you should not drive or use any tools or machines."*
 - generated answer: *"According to the PIL, it is recommended that you do not drive or use any tools or machines if cinnarizine tablets make you drowsy. However, there is no specific information on when exactly you can resume driving after taking the medication. It's also worth noting that the PIL advises against taking more tablets than prescribed by your doctor and to take them after a meal, but it does not provide guidance on how long this restriction applies to driving or using machines."*
 
-I would say that the generated answer is correct, although the final sentence seems unncessary. Perhaps this is why RAGAS gives it a low score? 
+I would say that the generated answer is correct, although the final sentence seems unnecessary. Perhaps this is why RAGAS gives it a low score? 
 
 A different sample scores 0.5 for faithfulness:
 
