@@ -24,7 +24,7 @@ uv run python -m rag_pipeline.run_evaluation --from-run <name>              # re
 uv run python -m rag_pipeline.run_evaluation --from-run <name> --skip-ragas # retrieval + refusal metrics only
 
 uv run ruff check . && uv run ruff format .
-uv run --with pytest pytest tests/                                   # pytest is not yet a declared dependency
+uv run --with pytest pytest tests/                                   
 uv run --with pytest pytest tests/test_retrieval_metrics.py::test_name
 ```
 
