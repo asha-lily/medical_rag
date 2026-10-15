@@ -25,11 +25,13 @@ As well as installing `fastapi`, we need to install `uvicorn` as the server.
 
 ### Build a `/query` endpoint
 
+#### Dummy version
+
 In `schemas.py` we define the `QueryRequest` pydantic model which defines what a request must look like. We also define `QueryResponse` which defines what a response from the service will look like. FastAPI is built on pydantic, and validates that both the request and response bodies adhere to their pydantic models. 
 
 I say 'bodies' here because requests and responses also contain headers, which contain metadata about the message. Since our query request body is a dictionary (`{"question": "<question>"}`), we need to add a `Content-Type: application/json` header so that FastAPI reads the body as JSON. Without this header in the request, the response contains this message: `Input should be a valid dictionary or object to extract fields from`. Other headers get added to the request automatically, e.g `Host: localhost:8000`.
 
-A question can be send to the `/query` endpoint with a curl request like the following:
+A question can be sent to the `/query` endpoint with a curl request like the following:
 
 ```
 curl -v -X POST http://localhost:8000/query \
@@ -45,8 +47,18 @@ For the hardcoded `post_query()` function, the following is returned as expected
 
 If the question is left empty, the response says `string should have at least 1 character`. This is because in the `schemas.py` query request model we've required the question to have `min_length=1`.
 
+#### FastAPI lifespan function
+
+We want to load the vector store, embedding model, retriever and LCEL train before the service starts accepting requests, so that we don't have to re-run this slow set-up for each request. FastAPI has a [lifespan](https://fastapi.tiangolo.com/advanced/events/) function which enables you to define what runs before the service starts accepting requests, and what happens after, i.e to shut down.
 
 
+### Handling Ollama being unavailable
+
+When Ollama is down, invoking the LCEL chain fails and raises a `ConnectionError`, so sending a request to `/query` results in `500 Internal Server Error`. We actually want the service to return `503: Service Unavailable` as this indicates that the server is running, but something it depends on isn't available. Later down the line, docker, or a load balancer, can act on a 503 error, but a 500 error is too vague.
+
+To address this, in the lifespan function, we can try invoking the LCEL chain but if it raises a `ConnectionError` then we can raise a `HTTPException` with status code 503.
+
+### Build a `/ready` endpoint
 
 
 
@@ -76,8 +88,6 @@ Just like with the choice between a hosted and local LLM, self-hosting might be 
 
 
 ## Questions
-
-Should I leave my existing code as it is, e.g run_rag.py?
 
 how to use hosted langfuse: I've signed up and got my API keys -- where do they go?
 

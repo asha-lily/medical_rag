@@ -1,8 +1,9 @@
-from pydantic import BaseModel, Field
+from typing import Annotated
+from pydantic import BaseModel, StringConstraints
 
 
 class QueryRequest(BaseModel):
-    question: str = Field(strip_whitespace=True, min_length=1)
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class Source(BaseModel):
