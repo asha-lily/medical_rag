@@ -19,40 +19,32 @@ In the past I've used Flask, but FastAPI is now more widely used, and has the be
 
 ### Build a `/health` endpoint
 
-Sending a `GET` request to the `/health` endpoint indicates whether the service is up and running. A response of `{"status": "ok"}` is returned when this is the case.
+Sending a `GET` request to the `/health` endpoint indicates whether the service is up and running; `{"status": "ok"}` should be returned. If the service is not running, checking the health (e.g by running `curl http://localhost:8000/health`) will return a `connection refused` error. If the service is running but something is broken, the request will timeout.
 
 As well as installing `fastapi`, we need to install `uvicorn` as the server.
 
+### Build a `/query` endpoint
 
-FastAPI is built on pydantic.
+In `schemas.py` we define the `QueryRequest` pydantic model which defines what a request must look like. We also define `QueryResponse` which defines what a response from the service will look like. FastAPI is built on pydantic, and validates that both the request and response bodies adhere to their pydantic models. 
 
-```
-from pydantic import BaseModel, Field
+I say 'bodies' here because requests and responses also contain headers, which contain metadata about the message. Since our query request body is a dictionary (`{"question": "<question>"}`), we need to add a `Content-Type: application/json` header so that FastAPI reads the body as JSON. Without this header in the request, the response contains this message: `Input should be a valid dictionary or object to extract fields from`. Other headers get added to the request automatically, e.g `Host: localhost:8000`.
 
-class QueryRequest(BaseModel):
-    question: str = Field(min_length=1)
-
-class Source(BaseModel):
-    source: str
-    page: int
-    chunk_id: str
-
-class QueryResponse(BaseModel):
-    answer: str
-    sources: list[Source]
-```
+A question can be send to the `/query` endpoint with a curl request like the following:
 
 ```
-rag_pipeline/
-  api/
-    __init__.py
-    schemas.py   ← the Pydantic models above (the contract)
-    main.py      ← the FastAPI app: lifespan loading + /query, /health, /ready
-  config.py
-  retrieval.py
-  generation.py
-  ...
+curl -v -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Can I take ibuprofen with paracetamol?"}'
 ```
+
+For the hardcoded `post_query()` function, the following is returned as expected:
+
+```
+{"answer":"This is a sample answer.","sources":[{"source":"sample source","page":1,"chunk_id":"sample_chunk_id"}]}
+```
+
+If the question is left empty, the response says `string should have at least 1 character`. This is because in the `schemas.py` query request model we've required the question to have `min_length=1`.
+
 
 
 
@@ -79,8 +71,6 @@ Just like with the choice between a hosted and local LLM, self-hosting might be 
 
 
 ## 5. Next steps
-
-When you're ready to start step 1, I can either write it for you or set you smaller tasks (e.g. "get /health returning {"status": "ok"}") and review what you write. Given your learning goal, I'd suggest the second.
 
 - Add streamlit UI?
 

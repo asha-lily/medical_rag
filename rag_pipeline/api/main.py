@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from schemas import QueryRequest, QueryResponse
+from rag_pipeline.api.schemas import QueryRequest, QueryResponse, Source
 
 app = FastAPI()
 
@@ -11,5 +11,7 @@ def get_health():
 
 @app.post("/query")
 def post_query(query_request: QueryRequest) -> QueryResponse:
-    result = {"answer": "This is a sample answer.", "sources": []}
-    return QueryResponse(**result)
+    return QueryResponse(
+        answer="This is a sample answer.",
+        sources=[Source(source="sample source", page=1, chunk_id="sample_chunk_id")],
+    )
