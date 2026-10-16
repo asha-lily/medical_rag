@@ -49,16 +49,38 @@ If the question is left empty, the response says `string should have at least 1 
 
 #### FastAPI lifespan function
 
-We want to load the vector store, embedding model, retriever and LCEL train before the service starts accepting requests, so that we don't have to re-run this slow set-up for each request. FastAPI has a [lifespan](https://fastapi.tiangolo.com/advanced/events/) function which enables you to define what runs before the service starts accepting requests, and what happens after, i.e to shut down.
+We want to load the vector store, embedding model, retriever and LCEL chain before the service starts accepting requests, so that we don't have to re-run this slow set-up for each request. FastAPI has a [lifespan](https://fastapi.tiangolo.com/advanced/events/) function which enables you to define what runs before the service starts accepting requests, and what happens after, i.e to shut down.
 
 
 ### Handling Ollama being unavailable
 
 When Ollama is down, invoking the LCEL chain fails and raises a `ConnectionError`, so sending a request to `/query` results in `500 Internal Server Error`. We actually want the service to return `503: Service Unavailable` as this indicates that the server is running, but something it depends on isn't available. Later down the line, docker, or a load balancer, can act on a 503 error, but a 500 error is too vague.
 
-To address this, in the lifespan function, we can try invoking the LCEL chain but if it raises a `ConnectionError` then we can raise a `HTTPException` with status code 503.
+To address this, in the `post_query()` function, we can try invoking the LCEL chain but if it raises a `ConnectionError` then we can raise a `HTTPException` with status code 503.
+
+`/query` returns 502 (Bad Gateway) rather than 503 when the model isn't pulled, because Ollama is running but returns an error (`ollama.ResponseError`). Waiting won't fix it, so 503 (which suggests trying again later) would be misleading.
 
 ### Build a `/ready` endpoint
+
+The `/health` endpoint only tells us whether the service is running, not whether it can actually answer questions. If Ollama is down, `/health` still returns `{"status": "ok"}`, but every request to `/query` fails. Sending a `GET` request to the `/ready` endpoint answers a different question: is the service running *and* able to do real work?
+
+This matters later on; if a health check fails, the process is broken and should be restarted. If a readiness check fails, the process is running fine but can't serve requests yet, so no traffic should be sent to it. Restarting the API won't bring Ollama back.
+
+`/ready` checks two things:
+
+1. **Ollama is reachable.** `ollama.Client().list()` asks Ollama which models it has pulled. If Ollama is down, it raises a `ConnectionError`.
+2. **The model used by the LCEL chain has been pulled.** Ollama can be running without `llama3.2` downloaded, in which case every query would fail. The model name is read from `GenerationConfig().model_name` rather than hardcoded, so that it stays in sync with the chain.
+
+If both checks pass, `{"status": "ready"}` is returned. Otherwise, the endpoint raises an `HTTPException` with status code 503.
+
+Here's how the three endpoints behave in each situation:
+
+| Situation | `/health` | `/ready` | `/query` |
+|---|---|---|---|
+| Everything working | 200 | 200 | 200 + answer |
+| Ollama down | 200 | 503 | 503 |
+| Model not pulled | 200 | 503 | 502 |
+
 
 
 
@@ -84,6 +106,8 @@ Just like with the choice between a hosted and local LLM, self-hosting might be 
 
 ## 5. Next steps
 
+- don't forget to add HF_HUB_OFFLINE=1 as an env var in the dockerfile
+    - without this, when loading the embedding model, requests are sent to huggingface to check for updates, even thought the model is cached. In a container this would fail / hang due to the container not having internet access. Setting HF_HUB_OFFLINE=1 means that only the cached copy gets used.
 - Add streamlit UI?
 
 
