@@ -103,8 +103,27 @@ Just like with the choice between a hosted and local LLM, self-hosting might be 
 ## 4. Add CI with GitHub actions
 
 
+## Tests
 
-## 5. Next steps
+For tests I'm using FastAPI's `TestClient`. This skips the network, which requests usually go through before reaching the application. Routing, pydantic validation, `HTTPException` handling and status codes all run exactly as in production.
+
+The main steps for testing an API are:
+
+1. Create a client for the app: `client = TestClient(app)`
+2. Replace external dependencies with fakes (e.g Ollama and the vector database). These dependencies might not be accessible in tests (e.g requiring network access) or might be non-deterministic. With fakes, we can control their behaviour.
+3. Structure each test with given -> when -> then. 
+    - Given: sets up the fake and expected outputs
+    - When: sends the request
+    - Then: checks that the response / outputs are as expected, e.g status codes and response body
+4. Cover 3 types of case:
+    - the happy path (200 status code)
+    - invalid input (4xx status code)
+    - dependency failures (5xx status code)
+
+
+
+
+## Next steps
 
 - don't forget to add HF_HUB_OFFLINE=1 as an env var in the dockerfile
     - without this, when loading the embedding model, requests are sent to huggingface to check for updates, even thought the model is cached. In a container this would fail / hang due to the container not having internet access. Setting HF_HUB_OFFLINE=1 means that only the cached copy gets used.
