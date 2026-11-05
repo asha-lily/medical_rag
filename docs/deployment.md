@@ -87,6 +87,22 @@ Here's how the three endpoints behave in each situation:
 
 ## 2. Containerise
 
+### Docker basics
+
+In order to run this service from a different machine, it would need the same packages, embedding model, python version etc that I have set-up. Using Docker we can create a package containing everything needed to run the service on any machine.
+
+This 'package' is called an 'image', and it gets built from a set of instructions called a dockerfile.
+
+- `docker build` builds an image from a dockerfile
+- `docker run` starts a container, which is a running copy of an image. It has its own files and network, separate from the machine it's being run on.
+
+In the dockerfile, to avoid having to build Linux and Python yourself, a base image can be used.
+
+If changes are made to the dockerfile, the image needs to be rebuilt. Docker reuses each instruction (layer) up to the first one that has changed. Therefore, things that rarely change (e.g packages) should be written before things that change often, such as the code for running the service.
+
+Inside the container, the service listens on port 8000; this needs to connect to a port on the local machine, since they're on separate networks.
+
+On a Mac (my laptop), docker runs containers inside a hidden Linux virtual machine. Ollama runs on the local GPU, which can't be accessed from the virtual machine, so we'll continue running Ollama locally and have the container connect out to it. The alternative would be putting Ollama in the container and it running on CPU, which would be very slow.
 
 
 ## 3. Add Langfuse with docker compose
