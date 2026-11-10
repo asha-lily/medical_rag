@@ -104,6 +104,30 @@ Inside the container, the service listens on port 8000; this needs to connect to
 
 On a Mac (my laptop), docker runs containers inside a hidden Linux virtual machine. Ollama runs on the local GPU, which can't be accessed from the virtual machine, so we'll continue running Ollama locally and have the container connect out to it. The alternative would be putting Ollama in the container and it running on CPU, which would be very slow.
 
+### Building the image
+
+I've added comments to the dockerfile to explain what each line does.
+
+The instructions to build the image are as follows:
+
+```
+docker build -t pil-rag .
+docker run --rm -p 8000:8000 \
+  -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  pil-rag
+
+```
+
+- `-t pil-rag` names the image. The `.` specifies the current directory as the folder docker is allowed to copy files from (i.e the `COPY` commands in the Dockerfile)
+- `--rm` deletes the container when it stops (but the image is kept)
+- `-p 8000:8000` connects local port 8000 (i.e on my Mac) to port 8000 in the container
+- `-e OLLAMA_HOST=...`: the default address for Ollama is `localhost`, which would point to the container itself. Setting an `OLLAMA_HOST` environment variable to `host.docker.internal...` sets the Ollama host to the machine running the container (i.e my mac).
+
+
+Note that I've added `HF_HUB_OFFLINE=1` in the Dockerfile, after the step that downloads the embedding model. Without this, loading the embedding model sends a request to Hugging Face to check for updates, even though the model is already in the image. Containers do have outgoing internet access by default, so this wouldn't usually fail, but turning the check off is still worthwhile:
+    - startup doesn't wait on a network request to Hugging Face
+    - the service still starts if the network is restricted or Hugging Face is down (e.g. on Cloud Run with restricted outgoing traffic)
+    - the model in the image can't change between runs
 
 ## 3. Add Langfuse with docker compose
 
@@ -141,8 +165,6 @@ The main steps for testing an API are:
 
 ## Next steps
 
-- don't forget to add HF_HUB_OFFLINE=1 as an env var in the dockerfile
-    - without this, when loading the embedding model, requests are sent to huggingface to check for updates, even thought the model is cached. In a container this would fail / hang due to the container not having internet access. Setting HF_HUB_OFFLINE=1 means that only the cached copy gets used.
 - Add streamlit UI?
 
 
