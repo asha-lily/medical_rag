@@ -111,6 +111,26 @@ Once you've built the vector store of document chunks, you can generate an answe
 
 `uv run python -m rag_pipeline.run_rag "<question>"`
 
+## Running the API with Docker (optional)
+
+The question-answering service can also run as a FastAPI app inside a Docker container. Indexing still runs locally.
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or `brew install --cask docker-desktop`), then open it so the Docker engine is running.
+
+2. Build the vector store locally first (see above). The image copies in `PIL_docs_vector_store/`.
+
+3. Build the image and start a container:
+
+       docker build -t pil-rag .
+       docker run --rm -p 127.0.0.1:8000:8000 \
+         -e OLLAMA_HOST=http://host.docker.internal:11434 \
+         pil-rag
+
+   Ollama runs on your Mac, not in the container, so keep `ollama serve` running. `OLLAMA_HOST` tells the container where to find it.
+
+4. Open http://localhost:8000/docs to send questions to the API. `/ready` checks that the container can reach Ollama.
+
+
 # Baseline results
 
 I built a ground truth data set of 13 samples (question-answer pairs). This is just for initial testing; I'd want a much larger, diverse dataset split into training & test subsets to evaluate the system before it goes anywhere near production. For more details, see `docs/evaluation.md`.

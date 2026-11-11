@@ -123,11 +123,19 @@ docker run --rm -p 8000:8000 \
 - `-p 8000:8000` connects local port 8000 (i.e on my Mac) to port 8000 in the container
 - `-e OLLAMA_HOST=...`: the default address for Ollama is `localhost`, which would point to the container itself. Setting an `OLLAMA_HOST` environment variable to `host.docker.internal...` sets the Ollama host to the machine running the container (i.e my mac).
 
+### Notes
 
-Note that I've added `HF_HUB_OFFLINE=1` in the Dockerfile, after the step that downloads the embedding model. Without this, loading the embedding model sends a request to Hugging Face to check for updates, even though the model is already in the image. Containers do have outgoing internet access by default, so this wouldn't usually fail, but turning the check off is still worthwhile:
-    - startup doesn't wait on a network request to Hugging Face
-    - the service still starts if the network is restricted or Hugging Face is down (e.g. on Cloud Run with restricted outgoing traffic)
+Note that I've added `HF_HUB_OFFLINE=1` in the Dockerfile, after the step that downloads the embedding model. Without this, loading the embedding model sends a request to Hugging Face to check for updates, even though the model is already in the image. Containers have outgoing internet access by default, so this wouldn't usually fail, but turning the check off is still worthwhile for the following reasons:
+    - starting the container doesn't wait on a network request to Hugging Face
+    - the service still starts if the network is restricted or Hugging Face is down
     - the model in the image can't change between runs
+
+### Docker Desktop
+
+Docker desktop runs the `docker engine` inside a small Linux virtual machine. The `docker engine` is what actually builds images and runs containers, and the `docker build` and `docker run` commands just send instructions to this engine.
+
+I installed docker desktop and made sure the application was running before building the docker image.
+
 
 ## 3. Add Langfuse with docker compose
 
