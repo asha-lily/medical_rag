@@ -111,6 +111,7 @@ The instructions to build the image are as follows:
 docker build -t pil-rag .
 docker run --rm -p 8000:8000 \
   -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  --env-file .env \
   pil-rag
 
 ```
@@ -119,6 +120,7 @@ docker run --rm -p 8000:8000 \
 - `--rm` deletes the container when it stops (but the image is kept)
 - `-p 8000:8000` connects local port 8000 (i.e on my Mac) to port 8000 in the container
 - `-e OLLAMA_HOST=...`: the default address for Ollama is `localhost`, which would point to the container itself. Setting an `OLLAMA_HOST` environment variable to `host.docker.internal...` sets the Ollama host to the machine running the container (i.e my mac).
+- `--env-file .env` makes the langfuse API keys available to the app
 
 ### Notes
 
@@ -183,7 +185,9 @@ Could not reach Ollama. Is `ollama serve` running? Failed to connect to Ollama. 
 INFO:     172.17.0.1:62492 - "GET /ready HTTP/1.1" 503 Service Unavailable
 ```
 
-## 3. Add Langfuse with docker compose
+## 3. Add Langfuse observability
+
+### About Langfuse
 
 Langfuse is an LLM observability tool which records what happens inside each request and displays it in a web dashboard. This will enable us to monitor latency and token usage, as well as the prompt and retrieved chunks for each question.
 
@@ -191,8 +195,31 @@ Langfuse has the benefit of being open source (unlike LangSmith) and is easier t
 
 As well as being a python library, Langfuse sends traces, so a web application needs to receive, store and display them. That web application needs to be run by someone, and needs databases behind it. We could use Langfuse cloud, or self-host.
 
-Just like with the choice between a hosted and local LLM, self-hosting might be preferred for systems working with sensitive data.
+Just like with the choice between a hosted and local LLM, self-hosting might be preferred for systems working with sensitive data. For now I'm choosing to use Langfuse cloud, just because it's easier to set-up.
 
+### Using Langfuse
+
+#### Terminology
+
+- A `trace` is the record of one request to the `/query` endpoint, from start to finish
+- Inside a trace are `observations`, one for each step of the chain. In this project there are 3 steps/observations: the retriever (which chunks were retrieved), the prompt (the exact text sent to the model) and the LLM call (the answer, tokens used and time taken)
+
+#### Steps
+
+1. Put langfuse API keys in `.env`
+2. Install langfuse: `uv add langfuse`
+3. Add the langfuse callback handler to the `lifespan()` function in `main.py`. This reads the API keys from the environment variables, and sends a trace of every chain run to langfuse
+4. Make the keys available to the app: add `--env-file .env` to the `docker run` command
+
+Now when I run the `docker run` command, the trace appears in langfuse cloud. Below is a screenshot of the observation table for a test request to `/query`:
+
+<img src="images/langfuse_observation_table.png" alt="Langfuse observation table for a single /query request" width="800">
+
+The table shows 13 observations. I don't find this view very helpful; I prefer the tree view, which shows how the steps are nested inside each other. I found the tree view by clicking on the bottom row of the table, which has the `RunnableSequence` label in the `trace name` column. This is shown in the screenshot below:
+
+<img src="images/langfuse_tree.png" alt="Langfuse tree view for a single /query request" width="800">
+
+The tree view shows that the request took 6.89s (upper left corner), and that the `ChatOllama` step took 6.67s of that. The document retriever step only took 0.21s. The green text shows the input to the generation model, and the output. Clicking on the `DocumentRetriever` observation would show the retrieved chunks.
 
 ## 4. Add CI with GitHub actions
 
