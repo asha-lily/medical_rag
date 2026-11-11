@@ -1,15 +1,19 @@
 """
-uv run uvicorn rag_pipeline.api.main:app --reload
+uv run uvicorn rag_pipeline.api.main:app --reload --env-file .env
+
+Then, go to the built-in FastAPI UI to try out sending requests: http://localhost:8000/docs
 """
 
-import ollama
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException
+import ollama
+from fastapi import FastAPI, HTTPException, Request
 from langchain_core.documents import Document
+from langfuse.langchain import CallbackHandler
 
 from rag_pipeline.api.schemas import QueryRequest, QueryResponse, Source
+from rag_pipeline.config import GenerationConfig
 from rag_pipeline.generation import create_rag_chain
 from rag_pipeline.retrieval import create_retriever
 from rag_pipeline.vector_store import (
@@ -17,7 +21,6 @@ from rag_pipeline.vector_store import (
     load_vector_store,
     vector_store_exists,
 )
-from rag_pipeline.config import GenerationConfig
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -26,7 +29,11 @@ log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the models and build the RAG chain once, before serving requests."""
+    """
+    Load the models and build the RAG chain once, before serving requests.
+
+    A Langfuse CallbackHandler is added so that a trace of every chain run is sent to Langfuse.
+    """
     if not vector_store_exists():
         raise RuntimeError(
             "Vector store not found. Run `uv run python -m rag_pipeline.run_indexing` first."
@@ -35,7 +42,9 @@ async def lifespan(app: FastAPI):
     embedding_model = create_embedding_model()
     store = load_vector_store(embedding_model)
     retriever = create_retriever(store, embedding_model)
-    app.state.rag_chain = create_rag_chain(retriever)
+    app.state.rag_chain = create_rag_chain(retriever).with_config(
+        callbacks=[CallbackHandler()]
+    )
     log.info("RAG chain ready.")
     yield
 
@@ -103,7 +112,7 @@ def check_if_ready():
         )
         raise HTTPException(
             status_code=503,
-            detail=f"Model not found.",
+            detail="Model not found.",
         )
 
     return {"status": "ready"}
