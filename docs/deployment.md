@@ -82,9 +82,6 @@ Here's how the three endpoints behave in each situation:
 | Model not pulled | 200 | 503 | 502 |
 
 
-
-
-
 ## 2. Containerise
 
 ### Docker basics
@@ -136,6 +133,55 @@ Docker desktop runs the `docker engine` inside a small Linux virtual machine. Th
 
 I installed docker desktop and made sure the application was running before building the docker image.
 
+### Test the service from outside the container
+
+As mentioned earlier, the local port 8000 is connected to the container.
+
+First let's test the `/health` endpoint:
+
+```
+curl http://localhost:8000/health
+```
+
+This returns `{"status":"ok"}`, which tells us that the service is up and running.
+
+Now let's test the `/ready` endpoint:
+
+```
+curl http://localhost:8000/ready
+```
+
+This returns `{"status":"ready"}`, which confirms that the container can reach Ollama.
+
+Now let's test the `/query` endpoint:
+
+```
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the maximum dose of paracetamol for adults?"}'
+```
+
+Let's also check that we get a 503 error from the `/ready` endpoint when Ollama isn't running locally. To include the status code in the response, I'll include `-i` in the curl command:
+
+```
+curl -i http://localhost:8000/ready
+```
+As expected, we get:
+
+```
+HTTP/1.1 503 Service Unavailable
+date: Wed, 11 Nov 2026 13:52:08 GMT
+server: uvicorn
+content-length: 54
+content-type: application/json
+{"detail":"LLM backend unavailable. Try again later."}
+```
+In the container log, we also see:
+
+```
+Could not reach Ollama. Is `ollama serve` running? Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible. https://ollama.com/download
+INFO:     172.17.0.1:62492 - "GET /ready HTTP/1.1" 503 Service Unavailable
+```
 
 ## 3. Add Langfuse with docker compose
 
