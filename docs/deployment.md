@@ -202,7 +202,7 @@ Just like with the choice between a hosted and local LLM, self-hosting might be 
 #### Terminology
 
 - A `trace` is the record of one request to the `/query` endpoint, from start to finish
-- Inside a trace are `observations`, one for each step of the chain. In this project there are 3 steps/observations: the retriever (which chunks were retrieved), the prompt (the exact text sent to the model) and the LLM call (the answer, tokens used and time taken)
+- Inside a trace are `observations`, one for each step of the chain. Examples include: the retriever (which chunks were retrieved), the prompt (the exact text sent to the model) and the LLM call (the answer, tokens used and time taken)
 
 #### Steps
 
@@ -220,6 +220,11 @@ The table shows 13 observations. I don't find this view very helpful; I prefer t
 <img src="images/langfuse_tree.png" alt="Langfuse tree view for a single /query request" width="800">
 
 The tree view shows that the request took 6.89s (upper left corner), and that the `ChatOllama` step took 6.67s of that. The document retriever step only took 0.21s. The green text shows the input to the generation model, and the output. Clicking on the `DocumentRetriever` observation would show the retrieved chunks.
+
+#### Connecting langfuse with claude code
+
+Langfuse provides an agent skill, which they describe as `a playbook your coding agent loads to learn how to use Langfuse correctly`. As per the [instructions](https://langfuse.com/agents#quickstart), I installed the skill by pasting the following into my claude code session: `"Install the Langfuse Agent Skill from github.com/langfuse/skills."`. Claude code also needs to be able to access my langfuse traces via the public API. The skill accesses this through the `langfuse-cli` tool, which requires `Node.js` to be installed. After installing this, claude code installs `langfuse-cli` and reads my langfuse API keys from `.env`. Then, claude code was able to read my langfuse traces and discuss them with me.
+
 
 ## 4. Add CI with GitHub actions
 

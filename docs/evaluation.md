@@ -275,3 +275,4 @@ As mentioned above, the purpose of the training dataset is to surface issues wit
 - To reduce the risk of retrieving information from the wrong PIL, I could add a classification step (i.e identify which medicine the query is asking about) and filter the chunks that can be retrieved from to those for the specific medicine.
     - Users may ask questions using brand names instead of the generic medicine name, so I could create mappings from brand names to medicine names to use in this classification step.
     - Users may misspell the medicine name. In test case 3 we saw how this can affect retrieval. The classification step could use fuzzy matching to identify the correct medicine name.
+- I noticed that 'printer artwork notes' (e.g barcodes, font sizes and colours) are extracted from pdfs by the current parser. This information is irrelevant to answering questions about the documents, so I could consider filtering it out.
