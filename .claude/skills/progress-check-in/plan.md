@@ -33,7 +33,11 @@ Each phase lists its goals and what "done" means. Status is not recorded here; t
 
 **Done when:** tests pass and are committed, and any run in `results/` can be traced back to the exact config and prompt that produced it.
 
-## Phase 4: Trustworthy evaluation
+## Phase 4: Deployment
+
+Docker, a FastAPI service, with GitHub Actions running tests and your evaluation suite on every change. Add tracing (Langfuse or OpenTelemetry) to track latency, token usage and cost per query.
+
+## Phase 5: Trustworthy evaluation
 
 - Grow the ground truth set beyond 13 questions, with coverage across medicines and categories, and split it into a training set (used to iterate) and a held-out test set (not used to make changes).
 - Measure how well the RAGAS judge agrees with my own labels on faithfulness and answer relevancy.
@@ -42,7 +46,7 @@ Each phase lists its goals and what "done" means. Status is not recorded here; t
 
 **Done when:** I have a judge-agreement figure I can quote, a held-out test set exists, and I know how far to trust the RAGAS scores.
 
-## Phase 5: Iterative improvements
+## Phase 6: Iterative improvements
 
 Each change is measured against the previous run on the training set and logged as an ADR. Candidates found by the baseline:
 
@@ -54,10 +58,6 @@ Each change is measured against the previous run on the training set and logged 
 Consider trying DSPy for prompt tuning.
 
 **Done when:** at least one change has been shown to help (or not) with evidence, and the final system is scored once on the held-out test set.
-
-## Phase 6: Deployment
-
-Docker, a FastAPI service, deployed to Cloud Run on GCP, with GitHub Actions running tests and your evaluation suite on every change. Add tracing (Langfuse or OpenTelemetry) to track latency, token usage and cost per query.
 
 ## Future work (after Phase 6)
 

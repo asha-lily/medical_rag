@@ -62,6 +62,7 @@ I'm setting out with the following plan:
 - [x] Build a simple RAG pipeline that can answer questions by retrieving relevant information from patient information leaflets.
 - [x] Evaluate this pipeline on basic metrics, including using RAGAS with an LLM judge to evaluate faithfulness and answer relevancy.
 - [ ] Add tests, prompt & experiment tracking
+- [ ] Build a FastAPI service to run question-answering, containerise with Docker and monitor with Langfuse.
 - [ ] Measure alignment between the RAGAS LLM judge and human labels. Compare different LLM judges.
 - [ ] Iteratively make improvements to the system based on the evaluation results.
 
