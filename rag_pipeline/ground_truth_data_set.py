@@ -74,6 +74,9 @@ def validate(questions: list[GroundTruthQuestion]) -> list[str]:
             problems.append(f"{q.id}: answerable question has no evidence")
         if not q.answerable and q.evidence:
             problems.append(f"{q.id}: unanswerable question should have no evidence")
+        for ev in q.evidence:
+            if not ev.quote.strip():
+                problems.append(f"{q.id}: evidence from {ev.source} has an empty quote")
     return problems
 
 
