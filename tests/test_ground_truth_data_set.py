@@ -3,13 +3,29 @@ uv run pytest tests/test_ground_truth_data_set.py
 """
 
 import pytest
+import yaml
 
 from rag_pipeline.ground_truth_data_set import (
     CATEGORIES,
     Evidence,
     GroundTruthQuestion,
+    load_ground_truth_set,
     validate,
 )
+
+ENTRY = {
+    "id": "q001",
+    "question": "What are the side effects of paracetamol?",
+    "answerable": True,
+    "category": "side_effects",
+    "evidence": [{"source": "paracetamol_PIL.pdf", "quote": "skin rashes"}],
+}
+
+
+def write_yaml(tmp_path, entries):
+    path = tmp_path / "ground_truth.yaml"
+    path.write_text(yaml.safe_dump(entries))
+    return path
 
 
 def question(**overrides) -> GroundTruthQuestion:
@@ -30,10 +46,10 @@ def test_duplicate_id_is_a_problem():
     expected_output = ["q001: duplicate id"]
 
     # When
-    actual_oiutput = validate(test_input)
+    actual_output = validate(test_input)
 
     # Then
-    assert actual_oiutput == expected_output
+    assert actual_output == expected_output
 
 
 def test_valid_question_has_no_problems():
@@ -110,3 +126,21 @@ def test_all_problems_are_reported_together():
 
     # Then
     assert set(problems) == set(expected_output)
+
+
+def test_load_raises_on_invalid_set(tmp_path):
+    with pytest.raises(ValueError, match="q001: duplicate id"):
+        load_ground_truth_set(write_yaml(tmp_path, [ENTRY, ENTRY]))
+
+
+def test_load_empty_file_gives_empty_list(tmp_path):
+    # Given
+    path = tmp_path / "empty.yaml"
+    path.write_text("")
+    expected_output = []
+
+    # When
+    actual_output = load_ground_truth_set(path)
+
+    # Then
+    assert actual_output == expected_output

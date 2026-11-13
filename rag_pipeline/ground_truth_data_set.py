@@ -80,11 +80,6 @@ def validate(questions: list[GroundTruthQuestion]) -> list[str]:
     return problems
 
 
-def is_placeholder(question: GroundTruthQuestion) -> bool:
-    """True if any evidence quote is still a TODO placeholder."""
-    return any(ev.quote.strip().upper().startswith("TODO") for ev in question.evidence)
-
-
 def load_ground_truth_set(
     path: Path = DEFAULT_GROUND_TRUTH_SET_PATH,
 ) -> list[GroundTruthQuestion]:
@@ -99,7 +94,4 @@ def load_ground_truth_set(
     if problems:
         raise ValueError("Ground truth set has problems:\n  " + "\n  ".join(problems))
 
-    placeholders = [q.id for q in questions if is_placeholder(q)]
-    if placeholders:
-        log.warning("Skipping unfinished entries: %s", ", ".join(placeholders))
-    return [q for q in questions if not is_placeholder(q)]
+    return questions
