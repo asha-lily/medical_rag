@@ -17,9 +17,9 @@ labels; refusal and RAGAS metrics do.
 import argparse
 import json
 import logging
-from pathlib import Path
 from dataclasses import asdict
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 from langchain_core.documents import Document
@@ -33,20 +33,14 @@ from rag_pipeline.config import (
 )
 from rag_pipeline.generation import create_answer_chain
 from rag_pipeline.ground_truth_data_set import (
-    GroundTruthQuestion,
     load_ground_truth_set,
 )
 from rag_pipeline.ragas_evaluation import evaluate_rag_samples
 from rag_pipeline.retrieval import retrieve
 from rag_pipeline.retrieval_metrics import (
-    evidence_ranks,
-    recall_at_k,
-    reciprocal_rank,
-    evaluate_question,
-    summarise,
     check_evidence_findable,
+    evaluate_question,
 )
-
 from rag_pipeline.vector_store import (
     create_embedding_model,
     load_vector_store,
@@ -96,13 +90,17 @@ def collect_run(label: str) -> dict:
     questions = load_ground_truth_set()
     embedding_model = create_embedding_model()
     store = load_vector_store(embedding_model)
+    chunks = _all_chunks(store)
+    if not chunks:
+        raise RuntimeError(
+            "Vector store is empty; delete PIL_docs_vector_store/ and re-run indexing."
+        )
+
     answer_chain = create_answer_chain()
 
     # Checked against the index this run used, so a later re-score of this
     # run isn't affected by re-indexing.
-    unfindable = check_evidence_findable(
-        [q for q in questions if q.answerable], _all_chunks(store)
-    )
+    unfindable = check_evidence_findable([q for q in questions if q.answerable], chunks)
 
     records = []
     for i, q in enumerate(questions, start=1):
